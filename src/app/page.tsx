@@ -1,447 +1,827 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 
-/* ─── Types ─── */
+// ─── Types ──────────────────────────────────────────────────────────────────
 interface Team {
   name: string;
   seed: number;
+  espnId: number;
   conference: string;
-  kenpomRating: number;
-  offensiveEff: number;
-  defensiveEff: number;
-  tempo: number;
-  sos: number;
-  threePointPct: number;
-  recentRecord: string;
-  tournamentRound: string;
-  region: string;
+  rating: number;
+  offEff: number;
+  defEff: number;
+  record: string;
+  coach: string;
 }
 
-interface Prediction {
-  teamA: Team;
-  teamB: Team;
+interface Matchup {
+  id: string;
+  round: number;
+  position: number;
+  teamA: Team | null;
+  teamB: Team | null;
+  winner: Team | null;
+}
+
+interface AnalysisData {
   winProbA: number;
   winProbB: number;
-  confidence: "High" | "Medium" | "Low";
-  isUpset: boolean;
   factors: string[];
   analysis: string;
-  historicalMatchups: { year: number; teamA: string; teamB: string; score: string; round: string }[];
+  recommended: "A" | "B";
 }
 
-/* ─── Mock Data: 2025 Tournament Teams ─── */
-const TEAMS: Team[] = [
-  { name: "Houston", seed: 1, conference: "Big 12", kenpomRating: 29.8, offensiveEff: 119.2, defensiveEff: 89.4, tempo: 64.8, sos: 3.1, threePointPct: 36.8, recentRecord: "14-1", tournamentRound: "Final Four", region: "South" },
-  { name: "Duke", seed: 1, conference: "ACC", kenpomRating: 28.5, offensiveEff: 121.5, defensiveEff: 93.0, tempo: 71.2, sos: 5.4, threePointPct: 37.2, recentRecord: "13-2", tournamentRound: "Final Four", region: "East" },
-  { name: "Auburn", seed: 1, conference: "SEC", kenpomRating: 30.1, offensiveEff: 120.8, defensiveEff: 90.7, tempo: 68.5, sos: 2.8, threePointPct: 35.9, recentRecord: "15-0", tournamentRound: "Final Four", region: "Midwest" },
-  { name: "Florida", seed: 1, conference: "SEC", kenpomRating: 27.9, offensiveEff: 118.6, defensiveEff: 90.7, tempo: 69.3, sos: 4.2, threePointPct: 38.1, recentRecord: "13-2", tournamentRound: "Final Four", region: "West" },
-  { name: "Tennessee", seed: 2, conference: "SEC", kenpomRating: 26.4, offensiveEff: 116.8, defensiveEff: 90.4, tempo: 63.5, sos: 6.1, threePointPct: 34.5, recentRecord: "12-3", tournamentRound: "Elite 8", region: "South" },
-  { name: "Alabama", seed: 2, conference: "SEC", kenpomRating: 25.8, offensiveEff: 118.1, defensiveEff: 92.3, tempo: 72.8, sos: 4.8, threePointPct: 36.1, recentRecord: "11-4", tournamentRound: "Sweet 16", region: "East" },
-  { name: "Iowa State", seed: 2, conference: "Big 12", kenpomRating: 26.1, offensiveEff: 115.9, defensiveEff: 89.8, tempo: 65.2, sos: 5.5, threePointPct: 35.4, recentRecord: "13-2", tournamentRound: "Elite 8", region: "Midwest" },
-  { name: "St. John's", seed: 2, conference: "Big East", kenpomRating: 25.2, offensiveEff: 117.3, defensiveEff: 92.1, tempo: 68.9, sos: 7.2, threePointPct: 35.8, recentRecord: "12-3", tournamentRound: "Sweet 16", region: "West" },
-  { name: "Michigan State", seed: 3, conference: "Big Ten", kenpomRating: 24.1, offensiveEff: 116.2, defensiveEff: 92.1, tempo: 67.8, sos: 8.3, threePointPct: 36.5, recentRecord: "11-4", tournamentRound: "Sweet 16", region: "South" },
-  { name: "Texas Tech", seed: 3, conference: "Big 12", kenpomRating: 23.8, offensiveEff: 115.4, defensiveEff: 91.6, tempo: 66.1, sos: 7.9, threePointPct: 33.8, recentRecord: "12-3", tournamentRound: "Sweet 16", region: "East" },
-  { name: "UConn", seed: 3, conference: "Big East", kenpomRating: 24.5, offensiveEff: 117.8, defensiveEff: 93.3, tempo: 68.2, sos: 9.1, threePointPct: 37.1, recentRecord: "10-5", tournamentRound: "Round of 32", region: "Midwest" },
-  { name: "Marquette", seed: 3, conference: "Big East", kenpomRating: 23.5, offensiveEff: 116.9, defensiveEff: 93.4, tempo: 70.5, sos: 8.8, threePointPct: 36.9, recentRecord: "11-4", tournamentRound: "Sweet 16", region: "West" },
-  { name: "Purdue", seed: 4, conference: "Big Ten", kenpomRating: 22.8, offensiveEff: 118.1, defensiveEff: 95.3, tempo: 67.4, sos: 10.2, threePointPct: 35.2, recentRecord: "10-5", tournamentRound: "Round of 32", region: "South" },
-  { name: "Arizona", seed: 4, conference: "Big 12", kenpomRating: 23.2, offensiveEff: 117.5, defensiveEff: 94.3, tempo: 72.1, sos: 6.7, threePointPct: 36.4, recentRecord: "11-4", tournamentRound: "Sweet 16", region: "East" },
-  { name: "Wisconsin", seed: 4, conference: "Big Ten", kenpomRating: 22.1, offensiveEff: 115.2, defensiveEff: 93.1, tempo: 63.8, sos: 11.4, threePointPct: 37.8, recentRecord: "12-3", tournamentRound: "Round of 32", region: "Midwest" },
-  { name: "Maryland", seed: 4, conference: "Big Ten", kenpomRating: 21.9, offensiveEff: 114.8, defensiveEff: 92.9, tempo: 68.6, sos: 9.8, threePointPct: 35.1, recentRecord: "10-5", tournamentRound: "Round of 32", region: "West" },
-  { name: "Clemson", seed: 5, conference: "ACC", kenpomRating: 20.5, offensiveEff: 113.2, defensiveEff: 92.7, tempo: 65.9, sos: 14.2, threePointPct: 34.6, recentRecord: "11-4", tournamentRound: "Round of 32", region: "South" },
-  { name: "Michigan", seed: 5, conference: "Big Ten", kenpomRating: 20.1, offensiveEff: 114.5, defensiveEff: 94.4, tempo: 69.3, sos: 12.8, threePointPct: 35.9, recentRecord: "10-5", tournamentRound: "Round of 32", region: "East" },
-  { name: "Oregon", seed: 5, conference: "Big Ten", kenpomRating: 19.8, offensiveEff: 113.8, defensiveEff: 94.0, tempo: 70.7, sos: 15.1, threePointPct: 34.2, recentRecord: "10-5", tournamentRound: "Round of 32", region: "Midwest" },
-  { name: "Memphis", seed: 5, conference: "AAC", kenpomRating: 20.3, offensiveEff: 115.1, defensiveEff: 94.8, tempo: 73.2, sos: 18.5, threePointPct: 33.5, recentRecord: "11-4", tournamentRound: "Round of 32", region: "West" },
-  { name: "BYU", seed: 6, conference: "Big 12", kenpomRating: 18.9, offensiveEff: 112.5, defensiveEff: 93.6, tempo: 66.8, sos: 16.3, threePointPct: 36.2, recentRecord: "10-5", tournamentRound: "Round of 64", region: "South" },
-  { name: "Illinois", seed: 6, conference: "Big Ten", kenpomRating: 19.2, offensiveEff: 114.1, defensiveEff: 94.9, tempo: 71.5, sos: 13.7, threePointPct: 34.8, recentRecord: "9-6", tournamentRound: "Round of 64", region: "East" },
-  { name: "Missouri", seed: 6, conference: "SEC", kenpomRating: 18.5, offensiveEff: 112.8, defensiveEff: 94.3, tempo: 68.4, sos: 17.2, threePointPct: 33.9, recentRecord: "10-5", tournamentRound: "Round of 64", region: "Midwest" },
-  { name: "Louisville", seed: 6, conference: "ACC", kenpomRating: 18.1, offensiveEff: 113.4, defensiveEff: 95.3, tempo: 69.8, sos: 19.5, threePointPct: 35.5, recentRecord: "9-6", tournamentRound: "Round of 64", region: "West" },
-  { name: "UCLA", seed: 7, conference: "Big Ten", kenpomRating: 17.2, offensiveEff: 112.1, defensiveEff: 94.9, tempo: 67.2, sos: 20.8, threePointPct: 34.1, recentRecord: "9-6", tournamentRound: "Round of 64", region: "South" },
-  { name: "Kansas", seed: 7, conference: "Big 12", kenpomRating: 17.8, offensiveEff: 113.5, defensiveEff: 95.7, tempo: 70.4, sos: 11.5, threePointPct: 35.7, recentRecord: "8-7", tournamentRound: "Round of 64", region: "East" },
-  { name: "Gonzaga", seed: 7, conference: "WCC", kenpomRating: 17.5, offensiveEff: 115.2, defensiveEff: 97.7, tempo: 72.6, sos: 28.3, threePointPct: 37.5, recentRecord: "10-5", tournamentRound: "Round of 64", region: "Midwest" },
-  { name: "Texas A&M", seed: 7, conference: "SEC", kenpomRating: 16.9, offensiveEff: 111.8, defensiveEff: 94.9, tempo: 65.5, sos: 15.9, threePointPct: 33.2, recentRecord: "9-6", tournamentRound: "Round of 64", region: "West" },
-  { name: "Florida Atlantic", seed: 8, conference: "AAC", kenpomRating: 15.2, offensiveEff: 110.5, defensiveEff: 95.3, tempo: 68.1, sos: 35.2, threePointPct: 34.8, recentRecord: "10-5", tournamentRound: "Round of 64", region: "South" },
-  { name: "Baylor", seed: 8, conference: "Big 12", kenpomRating: 15.8, offensiveEff: 111.9, defensiveEff: 96.1, tempo: 67.5, sos: 22.4, threePointPct: 35.3, recentRecord: "8-7", tournamentRound: "Round of 64", region: "East" },
-  { name: "Mississippi State", seed: 8, conference: "SEC", kenpomRating: 14.9, offensiveEff: 110.2, defensiveEff: 95.3, tempo: 66.8, sos: 18.7, threePointPct: 32.8, recentRecord: "9-6", tournamentRound: "Round of 64", region: "Midwest" },
-  { name: "San Diego State", seed: 8, conference: "MWC", kenpomRating: 15.5, offensiveEff: 109.8, defensiveEff: 94.3, tempo: 63.9, sos: 32.1, threePointPct: 33.5, recentRecord: "10-5", tournamentRound: "Round of 64", region: "West" },
-];
+// ─── Historical upset rates by seed matchup ─────────────────────────────────
+const UPSET_RATES: Record<string, number> = {
+  "1v16": 0.01, "2v15": 0.06, "3v14": 0.15, "4v13": 0.21,
+  "5v12": 0.35, "6v11": 0.37, "7v10": 0.39, "8v9": 0.49,
+};
 
-/* ─── Mock Prediction Engine ─── */
-function generatePrediction(teamA: Team, teamB: Team): Prediction {
-  const seedDiff = teamB.seed - teamA.seed;
-  const kenpomDiff = teamA.kenpomRating - teamB.kenpomRating;
-  const effDiff = (teamA.offensiveEff - teamA.defensiveEff) - (teamB.offensiveEff - teamB.defensiveEff);
+// ─── Region data: EAST, WEST, SOUTH, MIDWEST ───────────────────────────────
+const REGIONS: Record<string, Team[]> = {
+  EAST: [
+    { name: "Duke", seed: 1, espnId: 150, conference: "ACC", rating: 95.2, offEff: 121.3, defEff: 92.1, record: "31-3", coach: "Jon Scheyer" },
+    { name: "Alabama", seed: 2, espnId: 333, conference: "SEC", rating: 91.8, offEff: 118.7, defEff: 95.4, record: "25-8", coach: "Nate Oats" },
+    { name: "Wisconsin", seed: 3, espnId: 275, conference: "Big Ten", rating: 89.5, offEff: 115.2, defEff: 94.8, record: "26-9", coach: "Greg Gard" },
+    { name: "Arizona", seed: 4, espnId: 12, conference: "Big 12", rating: 87.9, offEff: 116.8, defEff: 97.2, record: "22-12", coach: "Tommy Lloyd" },
+    { name: "Oregon", seed: 5, espnId: 2483, conference: "Big Ten", rating: 86.4, offEff: 114.5, defEff: 96.3, record: "24-9", coach: "Dana Altman" },
+    { name: "BYU", seed: 6, espnId: 252, conference: "Big 12", rating: 85.1, offEff: 113.8, defEff: 97.1, record: "24-9", coach: "Kevin Young" },
+    { name: "Saint Mary's", seed: 7, espnId: 2608, conference: "WCC", rating: 84.3, offEff: 112.4, defEff: 96.8, record: "28-5", coach: "Randy Bennett" },
+    { name: "Mississippi St", seed: 8, espnId: 344, conference: "SEC", rating: 82.7, offEff: 111.2, defEff: 97.5, record: "21-12", coach: "Chris Jans" },
+    { name: "Baylor", seed: 9, espnId: 239, conference: "Big 12", rating: 82.1, offEff: 110.8, defEff: 97.9, record: "19-14", coach: "Scott Drew" },
+    { name: "Vanderbilt", seed: 10, espnId: 238, conference: "SEC", rating: 81.4, offEff: 109.6, defEff: 98.2, record: "20-12", coach: "Mark Byington" },
+    { name: "VCU", seed: 11, espnId: 2670, conference: "A-10", rating: 80.2, offEff: 108.9, defEff: 98.7, record: "28-6", coach: "Ryan Odom" },
+    { name: "Liberty", seed: 12, espnId: 2335, conference: "C-USA", rating: 79.1, offEff: 107.5, defEff: 99.1, record: "28-6", coach: "Ritchie McKay" },
+    { name: "Akron", seed: 13, espnId: 2006, conference: "MAC", rating: 77.8, offEff: 106.2, defEff: 99.8, record: "28-6", coach: "John Groce" },
+    { name: "Montana", seed: 14, espnId: 149, conference: "Big Sky", rating: 75.4, offEff: 104.8, defEff: 101.2, record: "25-9", coach: "Travis DeCuire" },
+    { name: "Robert Morris", seed: 15, espnId: 2523, conference: "Horizon", rating: 73.2, offEff: 103.1, defEff: 102.5, record: "26-8", coach: "Andrew Toole" },
+    { name: "Mt St Mary's", seed: 16, espnId: 116, conference: "MAAC", rating: 68.5, offEff: 99.4, defEff: 105.8, record: "22-12", coach: "Dan Engelstad" },
+  ],
+  WEST: [
+    { name: "Florida", seed: 1, espnId: 57, conference: "SEC", rating: 96.1, offEff: 122.5, defEff: 91.3, record: "30-4", coach: "Todd Golden" },
+    { name: "St. John's", seed: 2, espnId: 2599, conference: "Big East", rating: 92.4, offEff: 119.1, defEff: 94.2, record: "30-4", coach: "Rick Pitino" },
+    { name: "Texas Tech", seed: 3, espnId: 2641, conference: "Big 12", rating: 90.1, offEff: 116.3, defEff: 93.9, record: "25-8", coach: "Grant McCasland" },
+    { name: "Maryland", seed: 4, espnId: 120, conference: "Big Ten", rating: 88.2, offEff: 115.7, defEff: 96.1, record: "25-8", coach: "Kevin Willard" },
+    { name: "Memphis", seed: 5, espnId: 235, conference: "American", rating: 86.8, offEff: 114.9, defEff: 96.5, record: "29-5", coach: "Penny Hardaway" },
+    { name: "Missouri", seed: 6, espnId: 142, conference: "SEC", rating: 84.9, offEff: 113.5, defEff: 97.3, record: "22-11", coach: "Dennis Gates" },
+    { name: "Kansas", seed: 7, espnId: 2305, conference: "Big 12", rating: 83.7, offEff: 112.1, defEff: 97.0, record: "21-12", coach: "Bill Self" },
+    { name: "UConn", seed: 8, espnId: 41, conference: "Big East", rating: 83.0, offEff: 111.8, defEff: 97.4, record: "23-10", coach: "Dan Hurley" },
+    { name: "Oklahoma", seed: 9, espnId: 201, conference: "SEC", rating: 81.8, offEff: 110.4, defEff: 98.0, record: "20-13", coach: "Porter Moser" },
+    { name: "Arkansas", seed: 10, espnId: 8, conference: "SEC", rating: 81.2, offEff: 109.9, defEff: 98.4, record: "20-13", coach: "John Calipari" },
+    { name: "Drake", seed: 11, espnId: 2181, conference: "MVC", rating: 80.5, offEff: 109.2, defEff: 98.5, record: "30-3", coach: "Darian DeVries" },
+    { name: "Colorado St", seed: 12, espnId: 36, conference: "MWC", rating: 78.8, offEff: 107.1, defEff: 99.3, record: "25-9", coach: "Niko Medved" },
+    { name: "Grand Canyon", seed: 13, espnId: 2253, conference: "WAC", rating: 77.2, offEff: 106.5, defEff: 100.1, record: "26-7", coach: "Bryce Drew" },
+    { name: "UNC Wilmington", seed: 14, espnId: 350, conference: "CAA", rating: 75.8, offEff: 105.1, defEff: 101.0, record: "27-7", coach: "Takayo Siddle" },
+    { name: "Omaha", seed: 15, espnId: 2437, conference: "Summit", rating: 72.5, offEff: 102.8, defEff: 103.1, record: "22-12", coach: "Chris Crutchfield" },
+    { name: "Norfolk State", seed: 16, espnId: 2450, conference: "MEAC", rating: 67.8, offEff: 98.9, defEff: 106.2, record: "24-10", coach: "Robert Jones" },
+  ],
+  SOUTH: [
+    { name: "Auburn", seed: 1, espnId: 2, conference: "SEC", rating: 97.3, offEff: 123.1, defEff: 90.5, record: "28-5", coach: "Bruce Pearl" },
+    { name: "Michigan St", seed: 2, espnId: 127, conference: "Big Ten", rating: 92.8, offEff: 119.5, defEff: 93.8, record: "27-6", coach: "Tom Izzo" },
+    { name: "Iowa State", seed: 3, espnId: 66, conference: "Big 12", rating: 90.4, offEff: 116.1, defEff: 93.5, record: "24-9", coach: "T.J. Otzelberger" },
+    { name: "Texas A&M", seed: 4, espnId: 245, conference: "SEC", rating: 88.5, offEff: 115.9, defEff: 95.8, record: "22-10", coach: "Buzz Williams" },
+    { name: "Michigan", seed: 5, espnId: 130, conference: "Big Ten", rating: 87.1, offEff: 115.2, defEff: 96.0, record: "25-9", coach: "Dusty May" },
+    { name: "Ole Miss", seed: 6, espnId: 145, conference: "SEC", rating: 85.3, offEff: 113.7, defEff: 96.9, record: "22-11", coach: "Chris Beard" },
+    { name: "Marquette", seed: 7, espnId: 269, conference: "Big East", rating: 84.6, offEff: 112.8, defEff: 96.6, record: "23-10", coach: "Shaka Smart" },
+    { name: "Louisville", seed: 8, espnId: 97, conference: "ACC", rating: 83.4, offEff: 112.0, defEff: 96.9, record: "27-7", coach: "Pat Kelsey" },
+    { name: "Creighton", seed: 9, espnId: 156, conference: "Big East", rating: 82.5, offEff: 111.5, defEff: 97.6, record: "24-10", coach: "Greg McDermott" },
+    { name: "New Mexico", seed: 10, espnId: 167, conference: "MWC", rating: 81.6, offEff: 110.2, defEff: 98.0, record: "26-7", coach: "Richard Pitino" },
+    { name: "North Carolina", seed: 11, espnId: 153, conference: "ACC", rating: 80.8, offEff: 109.8, defEff: 98.4, record: "22-13", coach: "Hubert Davis" },
+    { name: "UC San Diego", seed: 12, espnId: 5765, conference: "Big West", rating: 79.5, offEff: 108.2, defEff: 98.9, record: "30-4", coach: "Eric Olen" },
+    { name: "Yale", seed: 13, espnId: 43, conference: "Ivy", rating: 77.5, offEff: 106.8, defEff: 100.0, record: "22-7", coach: "James Jones" },
+    { name: "Lipscomb", seed: 14, espnId: 288, conference: "ASUN", rating: 75.1, offEff: 104.5, defEff: 101.5, record: "25-9", coach: "Lennie Acuff" },
+    { name: "Bryant", seed: 15, espnId: 2803, conference: "A-East", rating: 72.8, offEff: 103.2, defEff: 102.8, record: "23-11", coach: "Chris Burns" },
+    { name: "Alabama State", seed: 16, espnId: 2011, conference: "SWAC", rating: 66.9, offEff: 97.8, defEff: 107.1, record: "19-15", coach: "Tony Pujol" },
+  ],
+  MIDWEST: [
+    { name: "Houston", seed: 1, espnId: 248, conference: "Big 12", rating: 96.8, offEff: 122.0, defEff: 89.8, record: "30-4", coach: "Kelvin Sampson" },
+    { name: "Tennessee", seed: 2, espnId: 2633, conference: "SEC", rating: 93.1, offEff: 119.8, defEff: 93.2, record: "27-7", coach: "Rick Barnes" },
+    { name: "Kentucky", seed: 3, espnId: 96, conference: "SEC", rating: 89.8, offEff: 116.5, defEff: 94.5, record: "22-11", coach: "Mark Pope" },
+    { name: "Purdue", seed: 4, espnId: 2509, conference: "Big Ten", rating: 88.0, offEff: 116.2, defEff: 96.0, record: "22-11", coach: "Matt Painter" },
+    { name: "Clemson", seed: 5, espnId: 228, conference: "ACC", rating: 86.6, offEff: 114.7, defEff: 96.2, record: "27-6", coach: "Brad Brownell" },
+    { name: "Illinois", seed: 6, espnId: 356, conference: "Big Ten", rating: 85.0, offEff: 113.9, defEff: 97.0, record: "21-12", coach: "Brad Underwood" },
+    { name: "UCLA", seed: 7, espnId: 26, conference: "Big Ten", rating: 84.1, offEff: 112.6, defEff: 97.2, record: "22-10", coach: "Mick Cronin" },
+    { name: "Gonzaga", seed: 8, espnId: 2250, conference: "WCC", rating: 83.2, offEff: 112.3, defEff: 97.1, record: "25-8", coach: "Mark Few" },
+    { name: "Georgia", seed: 9, espnId: 61, conference: "SEC", rating: 82.3, offEff: 111.0, defEff: 97.7, record: "20-12", coach: "Mike White" },
+    { name: "Utah State", seed: 10, espnId: 328, conference: "MWC", rating: 81.0, offEff: 109.5, defEff: 98.5, record: "26-7", coach: "Jerrod Calhoun" },
+    { name: "Xavier", seed: 11, espnId: 2752, conference: "Big East", rating: 80.4, offEff: 109.1, defEff: 98.6, record: "21-11", coach: "Sean Miller" },
+    { name: "McNeese", seed: 12, espnId: 2377, conference: "Southland", rating: 79.0, offEff: 107.8, defEff: 99.0, record: "27-6", coach: "Will Wade" },
+    { name: "High Point", seed: 13, espnId: 2272, conference: "Big South", rating: 77.0, offEff: 106.0, defEff: 100.4, record: "29-5", coach: "Tubby Smith" },
+    { name: "Troy", seed: 14, espnId: 2653, conference: "Sun Belt", rating: 74.8, offEff: 104.2, defEff: 101.8, record: "23-10", coach: "Scott Cross" },
+    { name: "Wofford", seed: 15, espnId: 2747, conference: "Southern", rating: 73.0, offEff: 103.5, defEff: 102.3, record: "19-15", coach: "Jay McAuley" },
+    { name: "SIU Edwardsville", seed: 16, espnId: 2565, conference: "OVC", rating: 67.2, offEff: 98.5, defEff: 106.5, record: "22-11", coach: "Brian Barone" },
+  ],
+};
 
-  let rawProb = 50 + (seedDiff * 2.5) + (kenpomDiff * 1.2) + (effDiff * 0.3);
-  rawProb = Math.min(95, Math.max(5, rawProb + (Math.random() * 8 - 4)));
-  const winProbA = Math.round(rawProb * 10) / 10;
-  const winProbB = Math.round((100 - winProbA) * 10) / 10;
+// ─── Prediction engine ──────────────────────────────────────────────────────
+function getMatchupKey(seedA: number, seedB: number): string {
+  const hi = Math.min(seedA, seedB);
+  const lo = Math.max(seedA, seedB);
+  return `${hi}v${lo}`;
+}
 
-  const probGap = Math.abs(winProbA - 50);
-  const confidence: "High" | "Medium" | "Low" = probGap > 20 ? "High" : probGap > 10 ? "Medium" : "Low";
+function computeAnalysis(a: Team, b: Team): AnalysisData {
+  const effGapA = (a.offEff - a.defEff) - (b.offEff - b.defEff);
+  const ratingGap = a.rating - b.rating;
+  const seedKey = getMatchupKey(a.seed, b.seed);
+  const historicalUpset = UPSET_RATES[seedKey] ?? 0.3;
 
-  const isUpset = (teamA.seed > teamB.seed && winProbA > 35) || (teamB.seed > teamA.seed && winProbB > 35);
+  // Base probability from rating
+  let probA = 1 / (1 + Math.pow(10, -ratingGap / 15));
+
+  // Adjust with historical upset rate
+  const isAHigherSeed = a.seed < b.seed;
+  if (isAHigherSeed) {
+    probA = probA * 0.6 + (1 - historicalUpset) * 0.4;
+  } else {
+    probA = probA * 0.6 + historicalUpset * 0.4;
+  }
+
+  probA = Math.max(0.03, Math.min(0.97, probA));
+  const probB = 1 - probA;
 
   const factors: string[] = [];
-  if (teamA.kenpomRating > teamB.kenpomRating + 5) factors.push(`${teamA.name}'s KenPom rating (${teamA.kenpomRating}) significantly outpaces ${teamB.name} (${teamB.kenpomRating})`);
-  else if (teamB.kenpomRating > teamA.kenpomRating + 5) factors.push(`${teamB.name}'s KenPom rating (${teamB.kenpomRating}) significantly outpaces ${teamA.name} (${teamA.kenpomRating})`);
-  if (teamA.defensiveEff < teamB.defensiveEff) factors.push(`${teamA.name}'s defensive efficiency (${teamA.defensiveEff}) is elite — top ${Math.max(5, Math.round(teamA.defensiveEff - 85))} nationally`);
-  else factors.push(`${teamB.name}'s defensive efficiency (${teamB.defensiveEff}) gives them an edge`);
-  if (teamA.threePointPct > 36) factors.push(`${teamA.name} shoots ${teamA.threePointPct}% from three — a perimeter threat in March`);
-  if (teamB.tempo > 71) factors.push(`${teamB.name}'s up-tempo style (${teamB.tempo} possessions/game) could force turnovers`);
-  if (factors.length < 3) factors.push(`${teamA.name} is ${teamA.recentRecord} in their last 15 games`);
-  if (factors.length < 4) factors.push(`Strength of schedule favors ${teamA.sos < teamB.sos ? teamA.name : teamB.name} (SOS rank: ${Math.min(teamA.sos, teamB.sos)})`);
+  if (Math.abs(effGapA) > 5) {
+    factors.push(
+      effGapA > 0
+        ? `${a.name} has a significant efficiency advantage (+${effGapA.toFixed(1)} net)`
+        : `${b.name} has a significant efficiency advantage (+${(-effGapA).toFixed(1)} net)`
+    );
+  } else {
+    factors.push(`Tight efficiency margins — net gap of just ${Math.abs(effGapA).toFixed(1)} points`);
+  }
 
-  const favored = winProbA > winProbB ? teamA : teamB;
-  const underdog = winProbA > winProbB ? teamB : teamA;
-  const analysis = `${favored.name} enters this matchup as the ${Math.abs(winProbA - winProbB) > 20 ? "clear" : "slight"} favorite, driven by ${favored.kenpomRating > underdog.kenpomRating ? "superior KenPom metrics" : "strong recent form"} and a ${favored.recentRecord} recent record. ${underdog.name}${isUpset ? " has legitimate upset potential" : " will need to control tempo"} — their ${underdog.defensiveEff < 94 ? "stifling defense" : underdog.threePointPct > 35.5 ? "perimeter shooting" : "balanced attack"} could be the x-factor. Watch for ${underdog.tempo > 70 ? "pace of play to be decisive" : "the battle on the glass"} in what should be a ${confidence === "High" ? "competitive but tilted" : "tightly contested"} affair.`;
+  if (Math.abs(a.seed - b.seed) >= 5) {
+    const fav = a.seed < b.seed ? a : b;
+    const dog = a.seed < b.seed ? b : a;
+    factors.push(
+      `Seed gap of ${Math.abs(a.seed - b.seed)} — historically, ${dog.seed}-seeds upset ${fav.seed}-seeds ${((a.seed < b.seed ? historicalUpset : 1 - historicalUpset) * 100).toFixed(0)}% of the time`
+    );
+  } else {
+    factors.push(`Close seeds (${a.seed} vs ${b.seed}) — expect a competitive, coin-flip style game`);
+  }
 
-  const historicalMatchups = [
-    { year: 2024, teamA: teamA.name, teamB: teamB.name, score: `${65 + Math.floor(Math.random() * 20)}-${60 + Math.floor(Math.random() * 18)}`, round: "Round of 32" },
-    { year: 2022, teamA: teamB.conference === "SEC" ? "Kentucky" : "Villanova", teamB: teamA.conference === "Big 12" ? "Texas" : "North Carolina", score: `${70 + Math.floor(Math.random() * 15)}-${65 + Math.floor(Math.random() * 15)}`, round: "Sweet 16" },
-    { year: 2019, teamA: teamA.seed <= 3 ? teamA.name : "Virginia", teamB: teamB.seed <= 3 ? teamB.name : "Purdue", score: `${72 + Math.floor(Math.random() * 12)}-${68 + Math.floor(Math.random() * 12)}`, round: "Elite 8" },
-  ];
+  const betterOff = a.offEff > b.offEff ? a : b;
+  const betterDef = a.defEff < b.defEff ? a : b;
+  if (betterOff.name !== betterDef.name) {
+    factors.push(`Stylistic clash: ${betterOff.name}'s offense (${betterOff.offEff}) vs ${betterDef.name}'s defense (${betterDef.defEff})`);
+  } else {
+    factors.push(`${betterOff.name} is superior on both ends of the floor`);
+  }
 
-  return { teamA, teamB, winProbA, winProbB, confidence, isUpset, factors, analysis, historicalMatchups };
+  const recommended: "A" | "B" = probA >= probB ? "A" : "B";
+  const favTeam = recommended === "A" ? a : b;
+  const dogTeam = recommended === "A" ? b : a;
+  const favProb = recommended === "A" ? probA : probB;
+
+  const analysis = `Our model gives ${favTeam.name} (${favTeam.record}) a ${(favProb * 100).toFixed(0)}% chance to advance. ${favTeam.coach}'s squad ranks with a ${favTeam.offEff} offensive efficiency and ${favTeam.defEff} defensive efficiency, ${favProb > 0.7 ? "making them a clear favorite" : "though this could be tighter than the seed line suggests"}. ${dogTeam.name} (${dogTeam.record}) ${favProb > 0.8 ? "faces an uphill battle but could pull the upset if they control tempo and limit turnovers" : "has a legitimate shot — look for their " + (dogTeam.offEff > dogTeam.defEff + 10 ? "offensive firepower" : "defensive grit") + " to keep this competitive"}.`;
+
+  return { winProbA: probA, winProbB: probB, factors, analysis, recommended };
 }
 
-/* ─── Quick Pick Matchups ─── */
-const QUICK_PICKS = [
-  { teamAName: "Houston", teamBName: "Duke", round: "Final Four" },
-  { teamAName: "Auburn", teamBName: "Florida", round: "Final Four" },
-  { teamAName: "Houston", teamBName: "Tennessee", round: "Elite 8" },
-  { teamAName: "Duke", teamBName: "Arizona", round: "Elite 8" },
-  { teamAName: "Auburn", teamBName: "Iowa State", round: "Elite 8" },
-  { teamAName: "Florida", teamBName: "Marquette", round: "Sweet 16" },
+// ─── Standard NCAA bracket order ────────────────────────────────────────────
+const SEED_MATCHUP_ORDER = [
+  [1, 16], [8, 9], [5, 12], [4, 13], [6, 11], [3, 14], [7, 10], [2, 15],
 ];
 
-/* ─── Components ─── */
+function buildRegionMatchups(regionTeams: Team[]): Matchup[] {
+  const byS: Record<number, Team> = {};
+  regionTeams.forEach((t) => (byS[t.seed] = t));
 
-function Header() {
-  return (
-    <header className="border-b border-[#2A2A30] px-6 py-4 flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-lg bg-[#3B82F6] flex items-center justify-center font-bold text-lg">
-          B<span className="text-[#EF9F27]">IQ</span>
-        </div>
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">BracketIQ</h1>
-          <p className="text-xs text-[#9CA3AF]">AI March Madness Predictor</p>
-        </div>
-      </div>
-      <div className="flex items-center gap-2 text-xs text-[#9CA3AF]">
-        <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-        Model Updated: March 30, 2026
-      </div>
-    </header>
+  return SEED_MATCHUP_ORDER.map(([sA, sB], i) => ({
+    id: `r64-${i}`,
+    round: 0,
+    position: i,
+    teamA: byS[sA] || null,
+    teamB: byS[sB] || null,
+    winner: null,
+  }));
+}
+
+// ─── Component ──────────────────────────────────────────────────────────────
+export default function MarchMadnessBracket() {
+  const [activeTab, setActiveTab] = useState<string>("SOUTH");
+  const [picks, setPicks] = useState<Record<string, Record<string, Team>>>({});
+  const [modalMatchup, setModalMatchup] = useState<{ region: string; round: number; pos: number } | null>(null);
+
+  const regionNames = ["EAST", "WEST", "SOUTH", "MIDWEST"];
+
+  // Build all rounds for a given region
+  const getRegionBracket = useCallback(
+    (region: string) => {
+      const teams = REGIONS[region];
+      if (!teams) return { rounds: [] as Matchup[][] };
+
+      const r64 = buildRegionMatchups(teams);
+      const rPicks = picks[region] || {};
+
+      // Apply picks to R64
+      r64.forEach((m) => {
+        const pickKey = `0-${m.position}`;
+        if (rPicks[pickKey]) m.winner = rPicks[pickKey];
+      });
+
+      const rounds: Matchup[][] = [r64];
+
+      // Build subsequent rounds
+      for (let round = 1; round <= 3; round++) {
+        const prev = rounds[round - 1];
+        const curr: Matchup[] = [];
+        for (let i = 0; i < prev.length; i += 2) {
+          const pos = i / 2;
+          const tA = prev[i].winner;
+          const tB = prev[i + 1]?.winner ?? null;
+          const pickKey = `${round}-${pos}`;
+          curr.push({
+            id: `r${round}-${pos}`,
+            round,
+            position: pos,
+            teamA: tA,
+            teamB: tB,
+            winner: rPicks[pickKey] || null,
+          });
+        }
+        rounds.push(curr);
+      }
+
+      return { rounds };
+    },
+    [picks]
   );
-}
 
-function ProbabilityBar({ probA, probB, teamAName, teamBName }: { probA: number; probB: number; teamAName: string; teamBName: string }) {
-  return (
-    <div className="w-full">
-      <div className="flex justify-between text-sm mb-1">
-        <span className="font-semibold">{teamAName} {probA.toFixed(1)}%</span>
-        <span className="font-semibold">{teamBName} {probB.toFixed(1)}%</span>
-      </div>
-      <div className="w-full h-4 rounded-full overflow-hidden bg-[#1C1C22] flex">
-        <div className="h-full bg-[#3B82F6] animate-bar-grow rounded-l-full transition-all" style={{ width: `${probA}%` }} />
-        <div className="h-full bg-[#EF9F27] animate-bar-grow rounded-r-full transition-all" style={{ width: `${probB}%` }} />
-      </div>
-    </div>
+  // Final Four data
+  const getFinalFour = useCallback(() => {
+    const regionOrder = ["SOUTH", "WEST", "EAST", "MIDWEST"];
+    const eliteWinners = regionOrder.map((r) => {
+      const p = picks[r] || {};
+      return p["3-0"] || null;
+    });
+
+    const ffPicks = picks["FINAL_FOUR"] || {};
+
+    const semi1: Matchup = {
+      id: "ff-0", round: 4, position: 0,
+      teamA: eliteWinners[0], teamB: eliteWinners[1],
+      winner: ffPicks["4-0"] || null,
+    };
+    const semi2: Matchup = {
+      id: "ff-1", round: 4, position: 1,
+      teamA: eliteWinners[2], teamB: eliteWinners[3],
+      winner: ffPicks["4-1"] || null,
+    };
+    const champ: Matchup = {
+      id: "ff-champ", round: 5, position: 0,
+      teamA: semi1.winner, teamB: semi2.winner,
+      winner: ffPicks["5-0"] || null,
+    };
+
+    return { semi1, semi2, champ, eliteWinners, regionOrder };
+  }, [picks]);
+
+  const handlePick = useCallback(
+    (region: string, round: number, position: number, team: Team) => {
+      setPicks((prev) => {
+        const rPicks = { ...(prev[region] || {}) };
+        const key = `${round}-${position}`;
+        rPicks[key] = team;
+
+        // Clear downstream picks that depended on a different winner
+        const clearDownstream = (r: number, p: number) => {
+          const nextR = r + 1;
+          const nextP = Math.floor(p / 2);
+          const nextKey = `${nextR}-${nextP}`;
+          if (rPicks[nextKey]) {
+            delete rPicks[nextKey];
+            clearDownstream(nextR, nextP);
+          }
+        };
+        clearDownstream(round, position);
+
+        return { ...prev, [region]: rPicks };
+      });
+      setModalMatchup(null);
+    },
+    []
   );
-}
 
-function ConfidenceBadge({ level }: { level: "High" | "Medium" | "Low" }) {
-  const colors = { High: "bg-green-500/20 text-green-400", Medium: "bg-yellow-500/20 text-yellow-400", Low: "bg-red-500/20 text-red-400" };
-  return <span className={`px-3 py-1 rounded-full text-xs font-semibold ${colors[level]}`}>{level} Confidence</span>;
-}
+  const roundLabels = ["ROUND OF 64", "ROUND OF 32", "SWEET 16", "ELITE EIGHT"];
 
-function UpsetBadge() {
-  return (
-    <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#EF9F27]/20 text-[#EF9F27] flex items-center gap-1">
-      ⚠️ Upset Alert
-    </span>
-  );
-}
+  // ─── Modal ────────────────────────────────────────────────────────────
+  const renderModal = () => {
+    if (!modalMatchup) return null;
+    const { region, round, pos } = modalMatchup;
 
-function StatsTable({ teamA, teamB }: { teamA: Team; teamB: Team }) {
-  const stats = [
-    { label: "Seed", a: teamA.seed, b: teamB.seed },
-    { label: "KenPom Rating", a: teamA.kenpomRating, b: teamB.kenpomRating },
-    { label: "Off. Efficiency", a: teamA.offensiveEff, b: teamB.offensiveEff },
-    { label: "Def. Efficiency", a: teamA.defensiveEff, b: teamB.defensiveEff },
-    { label: "Tempo", a: teamA.tempo, b: teamB.tempo },
-    { label: "SOS Rank", a: teamA.sos, b: teamB.sos },
-    { label: "3PT %", a: teamA.threePointPct, b: teamB.threePointPct },
-    { label: "Recent Record", a: teamA.recentRecord, b: teamB.recentRecord },
-  ];
+    let matchup: Matchup | null = null;
+    let pickRegion = region;
 
-  const better = (label: string, a: number | string, b: number | string) => {
-    if (typeof a === "string") return "";
-    if (label === "Def. Efficiency" || label === "SOS Rank" || label === "Seed") return (a as number) < (b as number) ? "text-green-400" : (a as number) > (b as number) ? "text-red-400" : "";
-    return (a as number) > (b as number) ? "text-green-400" : (a as number) < (b as number) ? "text-red-400" : "";
-  };
+    if (region === "FINAL_FOUR") {
+      const ff = getFinalFour();
+      if (round === 4) matchup = pos === 0 ? ff.semi1 : ff.semi2;
+      else matchup = ff.champ;
+      pickRegion = "FINAL_FOUR";
+    } else {
+      const bracket = getRegionBracket(region);
+      matchup = bracket.rounds[round]?.[pos] ?? null;
+    }
 
-  return (
-    <div className="animate-slide-in">
-      <h3 className="text-lg font-bold mb-3 flex items-center gap-2">📊 Stats Comparison</h3>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-[#2A2A30]">
-              <th className="text-left py-2 text-[#9CA3AF] font-medium">Stat</th>
-              <th className="text-center py-2 font-semibold text-[#3B82F6]">{teamA.name}</th>
-              <th className="text-center py-2 font-semibold text-[#EF9F27]">{teamB.name}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {stats.map((s) => (
-              <tr key={s.label} className="border-b border-[#2A2A30]/50 hover:bg-[#1C1C22]/50">
-                <td className="py-2 text-[#9CA3AF]">{s.label}</td>
-                <td className={`text-center py-2 font-mono ${better(s.label, s.a, s.b)}`}>{s.a}</td>
-                <td className={`text-center py-2 font-mono ${better(s.label, s.b, s.a)}`}>{s.b}</td>
-              </tr>
+    if (!matchup || !matchup.teamA || !matchup.teamB) return null;
+
+    const a = matchup.teamA;
+    const b = matchup.teamB;
+    const analysis = computeAnalysis(a, b);
+
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style={{ backgroundColor: "rgba(0,0,0,0.75)" }}
+        onClick={() => setModalMatchup(null)}
+      >
+        <div
+          className="w-full max-w-lg rounded-xl border border-gray-700 p-6"
+          style={{ backgroundColor: "#141418" }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="mb-4 text-center">
+            <div className="text-xs font-bold tracking-widest text-blue-400 mb-1">
+              {region === "FINAL_FOUR"
+                ? round === 5
+                  ? "NATIONAL CHAMPIONSHIP"
+                  : "FINAL FOUR"
+                : roundLabels[round] || ""}
+            </div>
+            <div className="text-lg font-bold text-white">
+              ({a.seed}) {a.name} vs ({b.seed}) {b.name}
+            </div>
+          </div>
+
+          {/* Probability bar */}
+          <div className="mb-4">
+            <div className="flex justify-between text-sm mb-1">
+              <span className="text-blue-400 font-semibold">{a.name} {(analysis.winProbA * 100).toFixed(0)}%</span>
+              <span className="text-orange-400 font-semibold">{(analysis.winProbB * 100).toFixed(0)}% {b.name}</span>
+            </div>
+            <div className="h-3 rounded-full overflow-hidden bg-gray-700 flex">
+              <div
+                className="h-full transition-all"
+                style={{
+                  width: `${analysis.winProbA * 100}%`,
+                  background: "linear-gradient(90deg, #3B82F6, #60A5FA)",
+                }}
+              />
+              <div
+                className="h-full transition-all"
+                style={{
+                  width: `${analysis.winProbB * 100}%`,
+                  background: "linear-gradient(90deg, #F97316, #FB923C)",
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Key factors */}
+          <div className="mb-4 space-y-2">
+            <div className="text-xs font-bold text-gray-400 tracking-wider">KEY FACTORS</div>
+            {analysis.factors.map((f, i) => (
+              <div key={i} className="flex items-start gap-2 text-sm text-gray-300">
+                <span className="text-yellow-400 mt-0.5">▸</span>
+                <span>{f}</span>
+              </div>
             ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function QuickPickCard({ teamA, teamB, round }: { teamA: Team; teamB: Team; round: string }) {
-  const pred = useMemo(() => generatePrediction(teamA, teamB), [teamA, teamB]);
-  return (
-    <div className="bg-[#141418] rounded-xl border border-[#2A2A30] p-4 hover:border-[#3B82F6]/50 transition-colors">
-      <div className="text-xs text-[#9CA3AF] mb-2 flex items-center justify-between">
-        <span>{round}</span>
-        {pred.isUpset && <span className="text-[#EF9F27] font-semibold text-[10px]">⚠️ UPSET</span>}
-      </div>
-      <div className="flex items-center justify-between mb-3">
-        <div className="text-sm">
-          <span className="text-[#9CA3AF] text-xs mr-1">({teamA.seed})</span>
-          <span className="font-semibold">{teamA.name}</span>
-        </div>
-        <span className="text-xs text-[#9CA3AF]">vs</span>
-        <div className="text-sm text-right">
-          <span className="font-semibold">{teamB.name}</span>
-          <span className="text-[#9CA3AF] text-xs ml-1">({teamB.seed})</span>
-        </div>
-      </div>
-      <ProbabilityBar probA={pred.winProbA} probB={pred.winProbB} teamAName={teamA.name} teamBName={teamB.name} />
-    </div>
-  );
-}
-
-function BracketView() {
-  const finalFour = [
-    { team: "Houston", seed: 1, region: "South" },
-    { team: "Duke", seed: 1, region: "East" },
-    { team: "Auburn", seed: 1, region: "Midwest" },
-    { team: "Florida", seed: 1, region: "West" },
-  ];
-
-  return (
-    <div className="animate-slide-in">
-      <h3 className="text-lg font-bold mb-4 flex items-center gap-2">🏆 Predicted Bracket — Final Four</h3>
-      <div className="flex flex-col items-center gap-4">
-        {/* Semis */}
-        <div className="grid grid-cols-2 gap-8 w-full max-w-2xl">
-          <div className="bg-[#141418] rounded-xl border border-[#2A2A30] p-4 text-center">
-            <p className="text-xs text-[#9CA3AF] mb-2">Semifinal 1</p>
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-[#3B82F6]">({finalFour[0].seed}) {finalFour[0].team}</span>
-              <span className="text-xs text-[#9CA3AF]">vs</span>
-              <span className="font-bold text-[#EF9F27]">({finalFour[1].seed}) {finalFour[1].team}</span>
-            </div>
-            <p className="text-xs text-green-400 mt-2">→ Houston advances (58.2%)</p>
           </div>
-          <div className="bg-[#141418] rounded-xl border border-[#2A2A30] p-4 text-center">
-            <p className="text-xs text-[#9CA3AF] mb-2">Semifinal 2</p>
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-[#3B82F6]">({finalFour[2].seed}) {finalFour[2].team}</span>
-              <span className="text-xs text-[#9CA3AF]">vs</span>
-              <span className="font-bold text-[#EF9F27]">({finalFour[3].seed}) {finalFour[3].team}</span>
-            </div>
-            <p className="text-xs text-green-400 mt-2">→ Auburn advances (55.8%)</p>
+
+          {/* AI Analysis */}
+          <div className="mb-5 rounded-lg p-3 border border-gray-600" style={{ backgroundColor: "#1a1a1f" }}>
+            <div className="text-xs font-bold text-gray-400 tracking-wider mb-1">AI ANALYSIS</div>
+            <p className="text-sm text-gray-300 leading-relaxed">{analysis.analysis}</p>
           </div>
-        </div>
-        {/* Arrow */}
-        <div className="text-2xl text-[#9CA3AF]">↓</div>
-        {/* Championship */}
-        <div className="bg-gradient-to-r from-[#3B82F6]/10 via-[#141418] to-[#EF9F27]/10 rounded-xl border border-[#3B82F6]/30 p-6 text-center w-full max-w-md">
-          <p className="text-xs text-[#EF9F27] font-semibold mb-2">🏆 National Championship</p>
-          <div className="flex items-center justify-between text-lg">
-            <span className="font-bold text-[#3B82F6]">(1) Houston</span>
-            <span className="text-[#9CA3AF]">vs</span>
-            <span className="font-bold text-[#EF9F27]">(1) Auburn</span>
+
+          {/* Team comparison */}
+          <div className="grid grid-cols-2 gap-3 mb-5 text-xs text-gray-400">
+            {[a, b].map((t, idx) => (
+              <div key={idx} className="rounded-lg p-2 text-center" style={{ backgroundColor: "#1a1a1f" }}>
+                <img
+                  src={`https://a.espncdn.com/i/teamlogos/ncaa/500/${t.espnId}.png`}
+                  alt={t.name}
+                  className="w-10 h-10 mx-auto mb-1 object-contain"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+                <div className="text-white font-bold text-sm">{t.name}</div>
+                <div>{t.record} · {t.conference}</div>
+                <div>Off: {t.offEff} · Def: {t.defEff}</div>
+                <div>Coach: {t.coach}</div>
+              </div>
+            ))}
           </div>
-          <div className="mt-3 py-2 px-4 bg-[#3B82F6]/20 rounded-lg inline-block">
-            <p className="text-sm font-bold text-[#3B82F6]">🎯 Predicted Champion: Houston Cougars</p>
-            <p className="text-xs text-[#9CA3AF]">Win probability: 53.4%</p>
+
+          {/* Pick buttons */}
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { team: a, label: "A", rec: analysis.recommended === "A" },
+              { team: b, label: "B", rec: analysis.recommended === "B" },
+            ].map(({ team, rec }) => (
+              <button
+                key={team.name}
+                onClick={() => handlePick(pickRegion, round, pos, team)}
+                className="py-3 rounded-lg font-bold text-sm transition-all border"
+                style={{
+                  backgroundColor: rec ? "#1e3a5f" : "#1a1a1f",
+                  borderColor: rec ? "#3B82F6" : "#374151",
+                  color: rec ? "#93C5FD" : "#9CA3AF",
+                }}
+              >
+                {rec && <span className="text-xs block text-blue-400 mb-0.5">★ AI PICK</span>}
+                Pick ({team.seed}) {team.name}
+              </button>
+            ))}
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-/* ─── Main Page ─── */
-export default function Home() {
-  const [teamAName, setTeamAName] = useState("");
-  const [teamBName, setTeamBName] = useState("");
-  const [prediction, setPrediction] = useState<Prediction | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const sortedTeams = useMemo(() => [...TEAMS].sort((a, b) => a.seed - b.seed || a.name.localeCompare(b.name)), []);
-
-  const handlePredict = () => {
-    const a = TEAMS.find((t) => t.name === teamAName);
-    const b = TEAMS.find((t) => t.name === teamBName);
-    if (!a || !b || a.name === b.name) return;
-    setIsLoading(true);
-    setPrediction(null);
-    setTimeout(() => {
-      setPrediction(generatePrediction(a, b));
-      setIsLoading(false);
-    }, 800);
+    );
   };
 
-  return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-      <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-8 space-y-10">
+  // ─── Team cell ────────────────────────────────────────────────────────
+  const TeamCell = ({
+    team,
+    isWinner,
+    isClickable,
+    onClick,
+  }: {
+    team: Team | null;
+    isWinner: boolean;
+    isClickable: boolean;
+    onClick?: () => void;
+  }) => {
+    if (!team) {
+      return (
+        <div
+          className="h-10 rounded border border-dashed flex items-center justify-center text-xs"
+          style={{ borderColor: "#2a2a30", color: "#4a4a50", minWidth: 150 }}
+        >
+          TBD
+        </div>
+      );
+    }
+    return (
+      <div
+        onClick={isClickable ? onClick : undefined}
+        className={`h-10 rounded flex items-center gap-2 px-2 border text-sm transition-all ${
+          isClickable ? "cursor-pointer hover:border-blue-500" : ""
+        }`}
+        style={{
+          backgroundColor: isWinner ? "#1e3a5f" : "#141418",
+          borderColor: isWinner ? "#3B82F6" : "#2a2a30",
+          minWidth: 150,
+        }}
+      >
+        <img
+          src={`https://a.espncdn.com/i/teamlogos/ncaa/500/${team.espnId}.png`}
+          alt=""
+          className="w-5 h-5 object-contain flex-shrink-0"
+          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+        />
+        <span
+          className="text-xs font-bold flex-shrink-0 w-5 h-5 rounded flex items-center justify-center"
+          style={{ backgroundColor: "#0A0A0C", color: seedColor(team.seed) }}
+        >
+          {team.seed}
+        </span>
+        <span className="text-white font-medium truncate text-xs">{team.name}</span>
+        {isWinner && <span className="ml-auto text-green-400 text-xs">✓</span>}
+      </div>
+    );
+  };
 
-        {/* ─── Matchup Predictor ─── */}
-        <section>
-          <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">🎯 Matchup Predictor</h2>
-          <div className="bg-[#141418] rounded-xl border border-[#2A2A30] p-6">
-            <div className="flex flex-col sm:flex-row gap-4 items-end">
-              <div className="flex-1 w-full">
-                <label className="block text-xs text-[#9CA3AF] mb-1">Team A</label>
-                <select
-                  value={teamAName}
-                  onChange={(e) => setTeamAName(e.target.value)}
-                  className="w-full bg-[#0A0A0C] border border-[#2A2A30] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#3B82F6] transition-colors"
-                >
-                  <option value="">Select team...</option>
-                  {sortedTeams.map((t) => (
-                    <option key={t.name} value={t.name}>({t.seed}) {t.name} — {t.conference}</option>
-                  ))}
-                </select>
-              </div>
-              <span className="text-lg font-bold text-[#9CA3AF] pb-2">VS</span>
-              <div className="flex-1 w-full">
-                <label className="block text-xs text-[#9CA3AF] mb-1">Team B</label>
-                <select
-                  value={teamBName}
-                  onChange={(e) => setTeamBName(e.target.value)}
-                  className="w-full bg-[#0A0A0C] border border-[#2A2A30] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#3B82F6] transition-colors"
-                >
-                  <option value="">Select team...</option>
-                  {sortedTeams.map((t) => (
-                    <option key={t.name} value={t.name}>({t.seed}) {t.name} — {t.conference}</option>
-                  ))}
-                </select>
-              </div>
-              <button
-                onClick={handlePredict}
-                disabled={!teamAName || !teamBName || teamAName === teamBName || isLoading}
-                className="px-6 py-2.5 bg-[#3B82F6] hover:bg-[#2563EB] disabled:opacity-40 disabled:cursor-not-allowed rounded-lg font-semibold text-sm transition-colors whitespace-nowrap"
+  // ─── Seed color coding ────────────────────────────────────────────────
+  function seedColor(seed: number): string {
+    if (seed <= 4) return "#34D399";
+    if (seed <= 8) return "#60A5FA";
+    if (seed <= 12) return "#FBBF24";
+    return "#F87171";
+  }
+
+  // ─── Region bracket renderer ──────────────────────────────────────────
+  const renderRegionBracket = (region: string) => {
+    const { rounds } = getRegionBracket(region);
+    const regionPicks = picks[region] || {};
+
+    return (
+      <div className="overflow-x-auto pb-4">
+        <div className="flex gap-1 min-w-fit items-start">
+          {rounds.map((roundMatchups, roundIdx) => (
+            <div key={roundIdx} className="flex flex-col" style={{ minWidth: 170 }}>
+              {/* Round header */}
+              <div
+                className="text-center text-xs font-bold tracking-wider mb-3 py-1.5 rounded"
+                style={{ color: "#9CA3AF", backgroundColor: "#141418" }}
               >
-                {isLoading ? "Analyzing..." : "Predict 🔮"}
-              </button>
-            </div>
-
-            {/* Loading */}
-            {isLoading && (
-              <div className="mt-6 flex items-center justify-center gap-3 text-[#9CA3AF]">
-                <div className="w-5 h-5 border-2 border-[#3B82F6] border-t-transparent rounded-full animate-spin" />
-                Running AI model...
+                {roundLabels[roundIdx]}
               </div>
-            )}
+              <div
+                className="flex flex-col justify-around flex-1"
+                style={{ gap: roundIdx === 0 ? 4 : undefined }}
+              >
+                {roundMatchups.map((matchup, mIdx) => {
+                  const pickKey = `${roundIdx}-${mIdx}`;
+                  const hasBothTeams = matchup.teamA && matchup.teamB;
+                  const isPicked = !!regionPicks[pickKey];
 
-            {/* Results */}
-            {prediction && !isLoading && (
-              <div className="mt-6 space-y-6 animate-slide-in">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <ConfidenceBadge level={prediction.confidence} />
-                  {prediction.isUpset && <UpsetBadge />}
-                </div>
+                  return (
+                    <div
+                      key={mIdx}
+                      className="flex flex-col gap-0.5 relative"
+                      style={{
+                        marginTop: roundIdx > 0 ? `${Math.pow(2, roundIdx) * 8}px` : 0,
+                        marginBottom: roundIdx > 0 ? `${Math.pow(2, roundIdx) * 8}px` : 0,
+                      }}
+                    >
+                      {/* Connector line */}
+                      {roundIdx > 0 && (
+                        <div
+                          className="absolute -left-1 top-1/2 w-1"
+                          style={{
+                            height: 1,
+                            backgroundColor: "#3B82F6",
+                            transform: "translateY(-50%)",
+                          }}
+                        />
+                      )}
+                      {roundIdx < rounds.length - 1 && (
+                        <div
+                          className="absolute -right-1 top-1/2 w-1"
+                          style={{
+                            height: 1,
+                            backgroundColor: "#2a2a30",
+                          }}
+                        />
+                      )}
 
-                <ProbabilityBar
-                  probA={prediction.winProbA}
-                  probB={prediction.winProbB}
-                  teamAName={prediction.teamA.name}
-                  teamBName={prediction.teamB.name}
-                />
-
-                {/* Key Factors */}
-                <div>
-                  <h4 className="font-semibold text-sm mb-2 text-[#9CA3AF]">Key Factors</h4>
-                  <ul className="space-y-1">
-                    {prediction.factors.map((f, i) => (
-                      <li key={i} className="text-sm flex items-start gap-2">
-                        <span className="text-[#3B82F6] mt-0.5">▸</span>
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {/* AI Analysis */}
-                <div className="bg-[#0A0A0C] rounded-lg p-4 border border-[#2A2A30]">
-                  <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">🤖 AI Analysis</h4>
-                  <p className="text-sm text-[#9CA3AF] leading-relaxed">{prediction.analysis}</p>
-                </div>
-
-                {/* Historical Matchups */}
-                <div>
-                  <h4 className="font-semibold text-sm mb-2 text-[#9CA3AF]">📜 Similar Historical Matchups</h4>
-                  <div className="grid gap-2">
-                    {prediction.historicalMatchups.map((m, i) => (
-                      <div key={i} className="flex items-center gap-3 text-sm bg-[#0A0A0C] rounded-lg px-3 py-2 border border-[#2A2A30]/50">
-                        <span className="text-[#3B82F6] font-mono">{m.year}</span>
-                        <span className="text-[#9CA3AF]">{m.round}:</span>
-                        <span>{m.teamA} vs {m.teamB}</span>
-                        <span className="ml-auto font-mono text-[#EF9F27]">{m.score}</span>
+                      <div
+                        onClick={() => {
+                          if (hasBothTeams && !isPicked) {
+                            setModalMatchup({ region, round: roundIdx, pos: mIdx });
+                          }
+                        }}
+                        className={`rounded-lg border p-1 ${
+                          hasBothTeams && !isPicked
+                            ? "cursor-pointer hover:border-blue-500 hover:shadow-lg hover:shadow-blue-500/10"
+                            : ""
+                        }`}
+                        style={{
+                          backgroundColor: "#0e0e12",
+                          borderColor: hasBothTeams && !isPicked ? "#3B82F6" : "#1e1e24",
+                        }}
+                      >
+                        <TeamCell
+                          team={matchup.teamA}
+                          isWinner={matchup.winner?.name === matchup.teamA?.name}
+                          isClickable={false}
+                        />
+                        <div className="h-px my-0.5" style={{ backgroundColor: "#1e1e24" }} />
+                        <TeamCell
+                          team={matchup.teamB}
+                          isWinner={matchup.winner?.name === matchup.teamB?.name}
+                          isClickable={false}
+                        />
                       </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Stats Table */}
-                <StatsTable teamA={prediction.teamA} teamB={prediction.teamB} />
+                    </div>
+                  );
+                })}
               </div>
-            )}
-          </div>
-        </section>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
-        {/* ─── Quick Picks ─── */}
-        <section>
-          <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">⚡ Quick Picks — Upcoming Matchups</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {QUICK_PICKS.map((qp, i) => {
-              const a = TEAMS.find((t) => t.name === qp.teamAName)!;
-              const b = TEAMS.find((t) => t.name === qp.teamBName)!;
-              return <QuickPickCard key={i} teamA={a} teamB={b} round={qp.round} />;
+  // ─── Final Four renderer ──────────────────────────────────────────────
+  const renderFinalFour = () => {
+    const ff = getFinalFour();
+    const ffPicks = picks["FINAL_FOUR"] || {};
+
+    const renderFFMatchup = (matchup: Matchup, round: number, pos: number, label: string) => {
+      const hasBoth = matchup.teamA && matchup.teamB;
+      const pickKey = `${round}-${pos}`;
+      const isPicked = !!ffPicks[pickKey];
+
+      return (
+        <div className="flex-1 max-w-sm">
+          <div className="text-center text-xs font-bold tracking-wider mb-2" style={{ color: "#9CA3AF" }}>
+            {label}
+          </div>
+          <div
+            onClick={() => {
+              if (hasBoth && !isPicked) {
+                setModalMatchup({ region: "FINAL_FOUR", round, pos });
+              }
+            }}
+            className={`rounded-lg border p-1.5 ${
+              hasBoth && !isPicked ? "cursor-pointer hover:border-blue-500" : ""
+            }`}
+            style={{
+              backgroundColor: "#0e0e12",
+              borderColor: hasBoth && !isPicked ? "#3B82F6" : "#1e1e24",
+            }}
+          >
+            <TeamCell
+              team={matchup.teamA}
+              isWinner={matchup.winner?.name === matchup.teamA?.name}
+              isClickable={false}
+            />
+            <div className="h-px my-1" style={{ backgroundColor: "#1e1e24" }} />
+            <TeamCell
+              team={matchup.teamB}
+              isWinner={matchup.winner?.name === matchup.teamB?.name}
+              isClickable={false}
+            />
+          </div>
+          {matchup.teamA && (
+            <div className="text-center mt-1">
+              <span className="text-xs text-gray-500">
+                {matchup.teamA
+                  ? `${ff.regionOrder[round === 4 ? pos * 2 : 0]} vs ${ff.regionOrder[round === 4 ? pos * 2 + 1 : 2]}`
+                  : ""}
+              </span>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    return (
+      <div className="flex flex-col items-center gap-8 py-4">
+        {/* Semi finals */}
+        <div className="flex gap-8 w-full max-w-2xl justify-center">
+          {renderFFMatchup(ff.semi1, 4, 0, "SEMIFINAL 1")}
+          {renderFFMatchup(ff.semi2, 4, 1, "SEMIFINAL 2")}
+        </div>
+
+        {/* Championship */}
+        <div className="w-full max-w-sm">
+          {renderFFMatchup(ff.champ, 5, 0, "🏆 NATIONAL CHAMPIONSHIP")}
+        </div>
+
+        {/* Champion display */}
+        {ff.champ.winner && (
+          <div className="text-center mt-4 p-6 rounded-xl border border-yellow-500/30" style={{ backgroundColor: "#1a1810" }}>
+            <div className="text-yellow-400 text-xs tracking-widest font-bold mb-2">🏆 PREDICTED NATIONAL CHAMPION 🏆</div>
+            <img
+              src={`https://a.espncdn.com/i/teamlogos/ncaa/500/${ff.champ.winner.espnId}.png`}
+              alt={ff.champ.winner.name}
+              className="w-20 h-20 mx-auto mb-2 object-contain"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+            <div className="text-3xl font-black text-white">{ff.champ.winner.name}</div>
+            <div className="text-sm text-yellow-400 mt-1">
+              ({ff.champ.winner.seed}) seed · {ff.champ.winner.record} · {ff.champ.winner.conference}
+            </div>
+            <div className="text-xs text-gray-400 mt-1">Coach: {ff.champ.winner.coach}</div>
+          </div>
+        )}
+
+        {/* Region winners */}
+        <div className="w-full max-w-2xl">
+          <div className="text-xs font-bold text-gray-400 tracking-wider mb-3 text-center">REGION CHAMPIONS</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {ff.regionOrder.map((r, i) => {
+              const winner = ff.eliteWinners[i];
+              return (
+                <div
+                  key={r}
+                  className="rounded-lg border p-3 text-center"
+                  style={{
+                    backgroundColor: winner ? "#141418" : "#0e0e12",
+                    borderColor: winner ? "#3B82F6" : "#1e1e24",
+                  }}
+                >
+                  <div className="text-xs text-gray-500 mb-1">{r}</div>
+                  {winner ? (
+                    <>
+                      <img
+                        src={`https://a.espncdn.com/i/teamlogos/ncaa/500/${winner.espnId}.png`}
+                        alt={winner.name}
+                        className="w-8 h-8 mx-auto mb-1 object-contain"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                      <div className="text-sm font-bold text-white">({winner.seed}) {winner.name}</div>
+                    </>
+                  ) : (
+                    <div className="text-sm text-gray-500">TBD</div>
+                  )}
+                </div>
+              );
             })}
           </div>
-        </section>
+        </div>
+      </div>
+    );
+  };
 
-        {/* ─── Bracket View ─── */}
-        <section>
-          <BracketView />
-        </section>
+  // ─── Progress tracker ─────────────────────────────────────────────────
+  const totalPicks = useMemo(() => {
+    let count = 0;
+    Object.values(picks).forEach((rp) => {
+      count += Object.keys(rp).length;
+    });
+    return count;
+  }, [picks]);
 
-        {/* Footer */}
-        <footer className="text-center text-xs text-[#9CA3AF] py-8 border-t border-[#2A2A30]">
-          <p>BracketIQ — AI-Powered March Madness Predictions</p>
-          <p className="mt-1">Model: BracketIQ v3.2 • Trained on 20+ years of tournament data • Updated March 30, 2026</p>
-          <p className="mt-1 text-[#9CA3AF]/60">For entertainment purposes only. Past performance does not guarantee future results.</p>
-        </footer>
-      </main>
+  const tabs = [...regionNames, "FINAL FOUR"];
+
+  return (
+    <div className="min-h-screen" style={{ backgroundColor: "#0A0A0C", color: "#E5E7EB" }}>
+      {/* Banner */}
+      <div
+        className="border-b"
+        style={{
+          borderColor: "#1e1e24",
+          background: "linear-gradient(180deg, #0f1020 0%, #0A0A0C 100%)",
+        }}
+      >
+        <div className="max-w-7xl mx-auto px-4 py-5 text-center">
+          <div className="text-xs tracking-[0.3em] text-blue-400 font-bold mb-1">
+            MARCH MADNESS
+          </div>
+          <h1 className="text-2xl md:text-3xl font-black text-white mb-1">
+            2026 NCAA Tournament Predictions
+          </h1>
+          <p className="text-xs text-gray-500">
+            Trained on 2013–2025 historical data · Seed differentials · Efficiency metrics · Upset probability modeling
+          </p>
+          <div className="flex items-center justify-center gap-4 mt-3 text-xs text-gray-400">
+            <span>
+              <span className="text-blue-400 font-bold">{totalPicks}</span> / 63 picks made
+            </span>
+            <span className="text-gray-600">|</span>
+            <span>64 teams · 4 regions · 6 rounds</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="border-b" style={{ borderColor: "#1e1e24" }}>
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex overflow-x-auto gap-0">
+            {tabs.map((tab) => {
+              const isActive = activeTab === (tab === "FINAL FOUR" ? "FINAL_FOUR" : tab);
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab === "FINAL FOUR" ? "FINAL_FOUR" : tab)}
+                  className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap transition-all border-b-2"
+                  style={{
+                    borderColor: isActive ? "#3B82F6" : "transparent",
+                    color: isActive ? "#3B82F6" : "#6B7280",
+                    backgroundColor: isActive ? "rgba(59,130,246,0.05)" : "transparent",
+                  }}
+                >
+                  {tab === "FINAL FOUR" ? "🏆 FINAL FOUR" : tab}
+                  {tab !== "FINAL FOUR" && (
+                    <span className="ml-1.5 text-gray-600">
+                      {Object.keys(picks[tab] || {}).length}/15
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        {activeTab === "FINAL_FOUR" ? (
+          renderFinalFour()
+        ) : (
+          <>
+            <div className="flex items-center gap-3 mb-4">
+              <h2 className="text-lg font-bold text-white">{activeTab} REGION</h2>
+              <span className="text-xs text-gray-500">
+                {activeTab === "EAST" && "Newark, NJ"}
+                {activeTab === "WEST" && "San Francisco, CA"}
+                {activeTab === "SOUTH" && "Atlanta, GA"}
+                {activeTab === "MIDWEST" && "Indianapolis, IN"}
+              </span>
+            </div>
+            <div className="text-xs text-gray-500 mb-4">
+              Click a highlighted matchup to see analysis and make your pick. Winners advance to the next round.
+            </div>
+            {renderRegionBracket(activeTab)}
+          </>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="border-t py-4 text-center text-xs text-gray-600" style={{ borderColor: "#1e1e24" }}>
+        Predictions based on KenPom-style efficiency metrics, historical upset rates by seed, and conference strength adjustments.
+        <br />
+        Not affiliated with the NCAA. For entertainment purposes only.
+      </div>
+
+      {/* Modal */}
+      {renderModal()}
     </div>
   );
 }
