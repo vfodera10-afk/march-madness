@@ -1,823 +1,1002 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useMemo } from "react";
+
+// ─── ESPN Team ID Map ───────────────────────────────────────────────────────
+const ESPN_IDS: Record<string, number> = {
+  "Ohio State": 194, "TCU": 2628, "Duke": 150, "Siena": 2561,
+  "Louisville": 97, "South Florida": 58, "Michigan State": 127,
+  "North Dakota State": 2449, "Wisconsin": 275, "High Point": 2272,
+  "Arkansas": 8, "Hawai'i": 62, "BYU": 252, "Texas": 251,
+  "Gonzaga": 2250, "Kennesaw State": 2320, "Nebraska": 158, "Troy": 2653,
+  "Vanderbilt": 238, "McNeese": 2377, "Saint Mary's": 2608,
+  "Texas A&M": 245, "Houston": 248, "Idaho": 70, "North Carolina": 153,
+  "VCU": 2670, "Illinois": 356, "Penn": 219, "Michigan": 130,
+  "Howard": 47, "Georgia": 61, "Saint Louis": 139, "Kentucky": 96,
+  "Santa Clara": 2541, "Iowa State": 66, "Tennessee State": 2634,
+  "Texas Tech": 2641, "Akron": 2006, "Alabama": 333, "Hofstra": 2275,
+  "Virginia": 258, "Wright State": 2750, "Tennessee": 2633,
+  "Miami Ohio": 193, "Clemson": 228, "Iowa": 2294, "Florida": 57,
+  "Prairie View A&M": 2504, "Arizona": 12, "Long Island": 2344,
+  "Villanova": 222, "Utah State": 328, "Purdue": 2509, "Queens": 3101,
+  "Miami Fla": 2390, "Missouri": 142, "St. John's": 2599, "UNI": 2460,
+  "Kansas": 2305, "Cal Baptist": 2856, "UCLA": 26, "UCF": 2116,
+  "UConn": 41, "Furman": 231,
+};
 
 // ─── Types ──────────────────────────────────────────────────────────────────
-interface Team {
+interface TeamData {
   name: string;
   seed: number;
-  espnId: number;
-  conference: string;
-  rating: number;
-  offEff: number;
-  defEff: number;
+  winProb: number;
   record: string;
   coach: string;
+  keyPlayer: string;
+  offEff: number;
+  defEff: number;
 }
 
-interface Matchup {
-  id: string;
-  round: number;
-  position: number;
-  teamA: Team | null;
-  teamB: Team | null;
-  winner: Team | null;
+interface Prediction {
+  gameId: number;
+  region: string;
+  site: string;
+  day: string;
+  teamA: TeamData;
+  teamB: TeamData;
+  winner: string;
+  confidence: number;
+  upsetRating: string;
+  topReasons: string[];
+  riskFactors: string[];
+  aiAnalysis: string;
+  bracketAdvice: string;
 }
 
-interface AnalysisData {
-  winProbA: number;
-  winProbB: number;
-  factors: string[];
-  analysis: string;
-  recommended: "A" | "B";
-}
-
-// ─── Historical upset rates by seed matchup ─────────────────────────────────
-const UPSET_RATES: Record<string, number> = {
-  "1v16": 0.01, "2v15": 0.06, "3v14": 0.15, "4v13": 0.21,
-  "5v12": 0.35, "6v11": 0.37, "7v10": 0.39, "8v9": 0.49,
-};
-
-// ─── Region data: EAST, WEST, SOUTH, MIDWEST ───────────────────────────────
-const REGIONS: Record<string, Team[]> = {
-  EAST: [
-    { name: "Duke", seed: 1, espnId: 150, conference: "ACC", rating: 95.2, offEff: 121.3, defEff: 92.1, record: "31-3", coach: "Jon Scheyer" },
-    { name: "Alabama", seed: 2, espnId: 333, conference: "SEC", rating: 91.8, offEff: 118.7, defEff: 95.4, record: "25-8", coach: "Nate Oats" },
-    { name: "Wisconsin", seed: 3, espnId: 275, conference: "Big Ten", rating: 89.5, offEff: 115.2, defEff: 94.8, record: "26-9", coach: "Greg Gard" },
-    { name: "Arizona", seed: 4, espnId: 12, conference: "Big 12", rating: 87.9, offEff: 116.8, defEff: 97.2, record: "22-12", coach: "Tommy Lloyd" },
-    { name: "Oregon", seed: 5, espnId: 2483, conference: "Big Ten", rating: 86.4, offEff: 114.5, defEff: 96.3, record: "24-9", coach: "Dana Altman" },
-    { name: "BYU", seed: 6, espnId: 252, conference: "Big 12", rating: 85.1, offEff: 113.8, defEff: 97.1, record: "24-9", coach: "Kevin Young" },
-    { name: "Saint Mary's", seed: 7, espnId: 2608, conference: "WCC", rating: 84.3, offEff: 112.4, defEff: 96.8, record: "28-5", coach: "Randy Bennett" },
-    { name: "Mississippi St", seed: 8, espnId: 344, conference: "SEC", rating: 82.7, offEff: 111.2, defEff: 97.5, record: "21-12", coach: "Chris Jans" },
-    { name: "Baylor", seed: 9, espnId: 239, conference: "Big 12", rating: 82.1, offEff: 110.8, defEff: 97.9, record: "19-14", coach: "Scott Drew" },
-    { name: "Vanderbilt", seed: 10, espnId: 238, conference: "SEC", rating: 81.4, offEff: 109.6, defEff: 98.2, record: "20-12", coach: "Mark Byington" },
-    { name: "VCU", seed: 11, espnId: 2670, conference: "A-10", rating: 80.2, offEff: 108.9, defEff: 98.7, record: "28-6", coach: "Ryan Odom" },
-    { name: "Liberty", seed: 12, espnId: 2335, conference: "C-USA", rating: 79.1, offEff: 107.5, defEff: 99.1, record: "28-6", coach: "Ritchie McKay" },
-    { name: "Akron", seed: 13, espnId: 2006, conference: "MAC", rating: 77.8, offEff: 106.2, defEff: 99.8, record: "28-6", coach: "John Groce" },
-    { name: "Montana", seed: 14, espnId: 149, conference: "Big Sky", rating: 75.4, offEff: 104.8, defEff: 101.2, record: "25-9", coach: "Travis DeCuire" },
-    { name: "Robert Morris", seed: 15, espnId: 2523, conference: "Horizon", rating: 73.2, offEff: 103.1, defEff: 102.5, record: "26-8", coach: "Andrew Toole" },
-    { name: "Mt St Mary's", seed: 16, espnId: 116, conference: "MAAC", rating: 68.5, offEff: 99.4, defEff: 105.8, record: "22-12", coach: "Dan Engelstad" },
-  ],
-  WEST: [
-    { name: "Florida", seed: 1, espnId: 57, conference: "SEC", rating: 96.1, offEff: 122.5, defEff: 91.3, record: "30-4", coach: "Todd Golden" },
-    { name: "St. John's", seed: 2, espnId: 2599, conference: "Big East", rating: 92.4, offEff: 119.1, defEff: 94.2, record: "30-4", coach: "Rick Pitino" },
-    { name: "Texas Tech", seed: 3, espnId: 2641, conference: "Big 12", rating: 90.1, offEff: 116.3, defEff: 93.9, record: "25-8", coach: "Grant McCasland" },
-    { name: "Maryland", seed: 4, espnId: 120, conference: "Big Ten", rating: 88.2, offEff: 115.7, defEff: 96.1, record: "25-8", coach: "Kevin Willard" },
-    { name: "Memphis", seed: 5, espnId: 235, conference: "American", rating: 86.8, offEff: 114.9, defEff: 96.5, record: "29-5", coach: "Penny Hardaway" },
-    { name: "Missouri", seed: 6, espnId: 142, conference: "SEC", rating: 84.9, offEff: 113.5, defEff: 97.3, record: "22-11", coach: "Dennis Gates" },
-    { name: "Kansas", seed: 7, espnId: 2305, conference: "Big 12", rating: 83.7, offEff: 112.1, defEff: 97.0, record: "21-12", coach: "Bill Self" },
-    { name: "UConn", seed: 8, espnId: 41, conference: "Big East", rating: 83.0, offEff: 111.8, defEff: 97.4, record: "23-10", coach: "Dan Hurley" },
-    { name: "Oklahoma", seed: 9, espnId: 201, conference: "SEC", rating: 81.8, offEff: 110.4, defEff: 98.0, record: "20-13", coach: "Porter Moser" },
-    { name: "Arkansas", seed: 10, espnId: 8, conference: "SEC", rating: 81.2, offEff: 109.9, defEff: 98.4, record: "20-13", coach: "John Calipari" },
-    { name: "Drake", seed: 11, espnId: 2181, conference: "MVC", rating: 80.5, offEff: 109.2, defEff: 98.5, record: "30-3", coach: "Darian DeVries" },
-    { name: "Colorado St", seed: 12, espnId: 36, conference: "MWC", rating: 78.8, offEff: 107.1, defEff: 99.3, record: "25-9", coach: "Niko Medved" },
-    { name: "Grand Canyon", seed: 13, espnId: 2253, conference: "WAC", rating: 77.2, offEff: 106.5, defEff: 100.1, record: "26-7", coach: "Bryce Drew" },
-    { name: "UNC Wilmington", seed: 14, espnId: 350, conference: "CAA", rating: 75.8, offEff: 105.1, defEff: 101.0, record: "27-7", coach: "Takayo Siddle" },
-    { name: "Omaha", seed: 15, espnId: 2437, conference: "Summit", rating: 72.5, offEff: 102.8, defEff: 103.1, record: "22-12", coach: "Chris Crutchfield" },
-    { name: "Norfolk State", seed: 16, espnId: 2450, conference: "MEAC", rating: 67.8, offEff: 98.9, defEff: 106.2, record: "24-10", coach: "Robert Jones" },
-  ],
-  SOUTH: [
-    { name: "Auburn", seed: 1, espnId: 2, conference: "SEC", rating: 97.3, offEff: 123.1, defEff: 90.5, record: "28-5", coach: "Bruce Pearl" },
-    { name: "Michigan St", seed: 2, espnId: 127, conference: "Big Ten", rating: 92.8, offEff: 119.5, defEff: 93.8, record: "27-6", coach: "Tom Izzo" },
-    { name: "Iowa State", seed: 3, espnId: 66, conference: "Big 12", rating: 90.4, offEff: 116.1, defEff: 93.5, record: "24-9", coach: "T.J. Otzelberger" },
-    { name: "Texas A&M", seed: 4, espnId: 245, conference: "SEC", rating: 88.5, offEff: 115.9, defEff: 95.8, record: "22-10", coach: "Buzz Williams" },
-    { name: "Michigan", seed: 5, espnId: 130, conference: "Big Ten", rating: 87.1, offEff: 115.2, defEff: 96.0, record: "25-9", coach: "Dusty May" },
-    { name: "Ole Miss", seed: 6, espnId: 145, conference: "SEC", rating: 85.3, offEff: 113.7, defEff: 96.9, record: "22-11", coach: "Chris Beard" },
-    { name: "Marquette", seed: 7, espnId: 269, conference: "Big East", rating: 84.6, offEff: 112.8, defEff: 96.6, record: "23-10", coach: "Shaka Smart" },
-    { name: "Louisville", seed: 8, espnId: 97, conference: "ACC", rating: 83.4, offEff: 112.0, defEff: 96.9, record: "27-7", coach: "Pat Kelsey" },
-    { name: "Creighton", seed: 9, espnId: 156, conference: "Big East", rating: 82.5, offEff: 111.5, defEff: 97.6, record: "24-10", coach: "Greg McDermott" },
-    { name: "New Mexico", seed: 10, espnId: 167, conference: "MWC", rating: 81.6, offEff: 110.2, defEff: 98.0, record: "26-7", coach: "Richard Pitino" },
-    { name: "North Carolina", seed: 11, espnId: 153, conference: "ACC", rating: 80.8, offEff: 109.8, defEff: 98.4, record: "22-13", coach: "Hubert Davis" },
-    { name: "UC San Diego", seed: 12, espnId: 5765, conference: "Big West", rating: 79.5, offEff: 108.2, defEff: 98.9, record: "30-4", coach: "Eric Olen" },
-    { name: "Yale", seed: 13, espnId: 43, conference: "Ivy", rating: 77.5, offEff: 106.8, defEff: 100.0, record: "22-7", coach: "James Jones" },
-    { name: "Lipscomb", seed: 14, espnId: 288, conference: "ASUN", rating: 75.1, offEff: 104.5, defEff: 101.5, record: "25-9", coach: "Lennie Acuff" },
-    { name: "Bryant", seed: 15, espnId: 2803, conference: "A-East", rating: 72.8, offEff: 103.2, defEff: 102.8, record: "23-11", coach: "Chris Burns" },
-    { name: "Alabama State", seed: 16, espnId: 2011, conference: "SWAC", rating: 66.9, offEff: 97.8, defEff: 107.1, record: "19-15", coach: "Tony Pujol" },
-  ],
-  MIDWEST: [
-    { name: "Houston", seed: 1, espnId: 248, conference: "Big 12", rating: 96.8, offEff: 122.0, defEff: 89.8, record: "30-4", coach: "Kelvin Sampson" },
-    { name: "Tennessee", seed: 2, espnId: 2633, conference: "SEC", rating: 93.1, offEff: 119.8, defEff: 93.2, record: "27-7", coach: "Rick Barnes" },
-    { name: "Kentucky", seed: 3, espnId: 96, conference: "SEC", rating: 89.8, offEff: 116.5, defEff: 94.5, record: "22-11", coach: "Mark Pope" },
-    { name: "Purdue", seed: 4, espnId: 2509, conference: "Big Ten", rating: 88.0, offEff: 116.2, defEff: 96.0, record: "22-11", coach: "Matt Painter" },
-    { name: "Clemson", seed: 5, espnId: 228, conference: "ACC", rating: 86.6, offEff: 114.7, defEff: 96.2, record: "27-6", coach: "Brad Brownell" },
-    { name: "Illinois", seed: 6, espnId: 356, conference: "Big Ten", rating: 85.0, offEff: 113.9, defEff: 97.0, record: "21-12", coach: "Brad Underwood" },
-    { name: "UCLA", seed: 7, espnId: 26, conference: "Big Ten", rating: 84.1, offEff: 112.6, defEff: 97.2, record: "22-10", coach: "Mick Cronin" },
-    { name: "Gonzaga", seed: 8, espnId: 2250, conference: "WCC", rating: 83.2, offEff: 112.3, defEff: 97.1, record: "25-8", coach: "Mark Few" },
-    { name: "Georgia", seed: 9, espnId: 61, conference: "SEC", rating: 82.3, offEff: 111.0, defEff: 97.7, record: "20-12", coach: "Mike White" },
-    { name: "Utah State", seed: 10, espnId: 328, conference: "MWC", rating: 81.0, offEff: 109.5, defEff: 98.5, record: "26-7", coach: "Jerrod Calhoun" },
-    { name: "Xavier", seed: 11, espnId: 2752, conference: "Big East", rating: 80.4, offEff: 109.1, defEff: 98.6, record: "21-11", coach: "Sean Miller" },
-    { name: "McNeese", seed: 12, espnId: 2377, conference: "Southland", rating: 79.0, offEff: 107.8, defEff: 99.0, record: "27-6", coach: "Will Wade" },
-    { name: "High Point", seed: 13, espnId: 2272, conference: "Big South", rating: 77.0, offEff: 106.0, defEff: 100.4, record: "29-5", coach: "Tubby Smith" },
-    { name: "Troy", seed: 14, espnId: 2653, conference: "Sun Belt", rating: 74.8, offEff: 104.2, defEff: 101.8, record: "23-10", coach: "Scott Cross" },
-    { name: "Wofford", seed: 15, espnId: 2747, conference: "Southern", rating: 73.0, offEff: 103.5, defEff: 102.3, record: "19-15", coach: "Jay McAuley" },
-    { name: "SIU Edwardsville", seed: 16, espnId: 2565, conference: "OVC", rating: 67.2, offEff: 98.5, defEff: 106.5, record: "22-11", coach: "Brian Barone" },
-  ],
-};
-
-// ─── Prediction engine ──────────────────────────────────────────────────────
-function getMatchupKey(seedA: number, seedB: number): string {
-  const hi = Math.min(seedA, seedB);
-  const lo = Math.max(seedA, seedB);
-  return `${hi}v${lo}`;
-}
-
-function computeAnalysis(a: Team, b: Team): AnalysisData {
-  const effGapA = (a.offEff - a.defEff) - (b.offEff - b.defEff);
-  const ratingGap = a.rating - b.rating;
-  const seedKey = getMatchupKey(a.seed, b.seed);
-  const historicalUpset = UPSET_RATES[seedKey] ?? 0.3;
-
-  // Base probability from rating
-  let probA = 1 / (1 + Math.pow(10, -ratingGap / 15));
-
-  // Adjust with historical upset rate
-  const isAHigherSeed = a.seed < b.seed;
-  if (isAHigherSeed) {
-    probA = probA * 0.6 + (1 - historicalUpset) * 0.4;
-  } else {
-    probA = probA * 0.6 + historicalUpset * 0.4;
-  }
-
-  probA = Math.max(0.03, Math.min(0.97, probA));
-  const probB = 1 - probA;
-
-  const factors: string[] = [];
-  if (Math.abs(effGapA) > 5) {
-    factors.push(
-      effGapA > 0
-        ? `${a.name} has a significant efficiency advantage (+${effGapA.toFixed(1)} net)`
-        : `${b.name} has a significant efficiency advantage (+${(-effGapA).toFixed(1)} net)`
-    );
-  } else {
-    factors.push(`Tight efficiency margins — net gap of just ${Math.abs(effGapA).toFixed(1)} points`);
-  }
-
-  if (Math.abs(a.seed - b.seed) >= 5) {
-    const fav = a.seed < b.seed ? a : b;
-    const dog = a.seed < b.seed ? b : a;
-    factors.push(
-      `Seed gap of ${Math.abs(a.seed - b.seed)} — historically, ${dog.seed}-seeds upset ${fav.seed}-seeds ${((a.seed < b.seed ? historicalUpset : 1 - historicalUpset) * 100).toFixed(0)}% of the time`
-    );
-  } else {
-    factors.push(`Close seeds (${a.seed} vs ${b.seed}) — expect a competitive, coin-flip style game`);
-  }
-
-  const betterOff = a.offEff > b.offEff ? a : b;
-  const betterDef = a.defEff < b.defEff ? a : b;
-  if (betterOff.name !== betterDef.name) {
-    factors.push(`Stylistic clash: ${betterOff.name}'s offense (${betterOff.offEff}) vs ${betterDef.name}'s defense (${betterDef.defEff})`);
-  } else {
-    factors.push(`${betterOff.name} is superior on both ends of the floor`);
-  }
-
-  const recommended: "A" | "B" = probA >= probB ? "A" : "B";
-  const favTeam = recommended === "A" ? a : b;
-  const dogTeam = recommended === "A" ? b : a;
-  const favProb = recommended === "A" ? probA : probB;
-
-  const analysis = `Our model gives ${favTeam.name} (${favTeam.record}) a ${(favProb * 100).toFixed(0)}% chance to advance. ${favTeam.coach}'s squad ranks with a ${favTeam.offEff} offensive efficiency and ${favTeam.defEff} defensive efficiency, ${favProb > 0.7 ? "making them a clear favorite" : "though this could be tighter than the seed line suggests"}. ${dogTeam.name} (${dogTeam.record}) ${favProb > 0.8 ? "faces an uphill battle but could pull the upset if they control tempo and limit turnovers" : "has a legitimate shot — look for their " + (dogTeam.offEff > dogTeam.defEff + 10 ? "offensive firepower" : "defensive grit") + " to keep this competitive"}.`;
-
-  return { winProbA: probA, winProbB: probB, factors, analysis, recommended };
-}
-
-// ─── Standard NCAA bracket order ────────────────────────────────────────────
-const SEED_MATCHUP_ORDER = [
-  [1, 16], [8, 9], [5, 12], [4, 13], [6, 11], [3, 14], [7, 10], [2, 15],
+// ─── All 32 Predictions (from predictions.json) ────────────────────────────
+const PREDICTIONS: Prediction[] = [
+  {
+    gameId: 1, region: "EAST", site: "Greenville, SC", day: "Thursday",
+    teamA: { name: "Ohio State", seed: 8, winProb: 0.52, record: "22-12", coach: "Jake Diebler", keyPlayer: "Bruce Thornton", offEff: 114.5, defEff: 96.2 },
+    teamB: { name: "TCU", seed: 9, winProb: 0.48, record: "22-11", coach: "Jamie Dixon", keyPlayer: "Vasean Allette", offEff: 112.8, defEff: 96.9 },
+    winner: "Ohio State", confidence: 5, upsetRating: "toss-up",
+    topReasons: ["Ohio State's Big Ten defensive scheming gives them a slight edge in half-court play", "Thornton's tournament experience as a 4-year guard provides steadying presence", "8-9 games are historically coin flips — slight lean to the higher seed"],
+    riskFactors: ["TCU's Dixon has deep tournament coaching experience", "Ohio State's offense can go cold from three in hostile environments", "TCU's Big 12 schedule may have better prepared them for this intensity"],
+    aiAnalysis: "Classic 8-9 toss-up. Ohio State's defensive metrics are slightly better, and they've played a rigorous Big Ten schedule. TCU brings Jamie Dixon's tournament savvy and Big 12 battle-testing. This game will likely come down to which team shoots better from three in the second half. Ohio State gets the slightest edge due to Thornton's steadiness, but this is genuinely a coin flip.",
+    bracketAdvice: "True toss-up. Pick based on Round of 32 matchup — who do you want facing Duke?"
+  },
+  {
+    gameId: 2, region: "EAST", site: "Greenville, SC", day: "Thursday",
+    teamA: { name: "Duke", seed: 1, winProb: 0.99, record: "32-2", coach: "Jon Scheyer", keyPlayer: "Cooper Flagg", offEff: 124.6, defEff: 89.1 },
+    teamB: { name: "Siena", seed: 16, winProb: 0.01, record: "24-10", coach: "Carmen Maciariello", keyPlayer: "Jordan Burdick", offEff: 102.3, defEff: 108.1 },
+    winner: "Duke", confidence: 10, upsetRating: "near-impossible",
+    topReasons: ["Duke is the #1 overall seed with a 32-2 record and elite metrics across the board", "Cooper Flagg is a generational talent — projected #1 NBA pick", "Siena's MAAC schedule hasn't prepared them for this level of athleticism and depth"],
+    riskFactors: ["Historically, 1-seeds have lost to 16-seeds twice (UMBC 2018, FDU 2023)", "Early tip-off could create flat start for Duke"],
+    aiAnalysis: "This is about as close to a lock as exists in March Madness. Duke is the #1 overall seed, AP #1, and loaded with NBA talent led by Cooper Flagg. Siena won the MAAC tournament to get here but faces a massive talent gap. Duke's offensive and defensive efficiency are both elite. The only question is the margin of victory.",
+    bracketAdvice: "Lock Duke. If you pick Siena, you're lighting your bracket on fire for attention."
+  },
+  {
+    gameId: 3, region: "EAST", site: "Buffalo, NY", day: "Thursday",
+    teamA: { name: "Louisville", seed: 6, winProb: 0.60, record: "23-10", coach: "Pat Kelsey", keyPlayer: "Chucky Hepburn", offEff: 113.8, defEff: 95.5 },
+    teamB: { name: "South Florida", seed: 11, winProb: 0.40, record: "24-10", coach: "Amir Abdur-Rahim", keyPlayer: "Jayden Reid", offEff: 110.5, defEff: 97.2 },
+    winner: "Louisville", confidence: 6, upsetRating: "moderate-risk",
+    topReasons: ["Louisville's ACC schedule provides superior preparation for tournament intensity", "Pat Kelsey's energy and defensive identity give Louisville an edge in grind-out games", "Louisville's size advantage should control the boards"],
+    riskFactors: ["South Florida is riding momentum as a likely play-in/bubble survivor", "11-seeds historically upset 6-seeds 37% of the time — very live upset spot", "Louisville's inconsistency against sub-100 KenPom teams is concerning"],
+    aiAnalysis: "The 6-11 line is historically one of the most upset-prone in the tournament. Louisville has the talent advantage but South Florida's AAC run and momentum factor make this dangerous. Louisville's defensive identity under Kelsey should prevail, but USF has the athletes to make this uncomfortable. Classic trap game for anyone autopiloting chalk.",
+    bracketAdvice: "Louisville is the right pick, but this is a live upset spot. Don't be shocked if USF pulls it off."
+  },
+  {
+    gameId: 4, region: "EAST", site: "Buffalo, NY", day: "Thursday",
+    teamA: { name: "Michigan State", seed: 3, winProb: 0.87, record: "25-7", coach: "Tom Izzo", keyPlayer: "Jaden Akins", offEff: 117.2, defEff: 93.8 },
+    teamB: { name: "North Dakota State", seed: 14, winProb: 0.13, record: "26-8", coach: "David Richman", keyPlayer: "Andrew Morgan", offEff: 105.8, defEff: 103.2 },
+    winner: "Michigan State", confidence: 8, upsetRating: "unlikely",
+    topReasons: ["Tom Izzo is the best tournament coach alive — his teams consistently overperform seeds", "Michigan State's defensive physicality will overwhelm NDSU's Summit League offense", "AP #11 with a brutal Big Ten schedule — battle-tested"],
+    riskFactors: ["NDSU has pulled off tournament upsets before (2009 vs Kansas, 2014 vs Oklahoma)", "If MSU starts cold from three, NDSU can hang around with disciplined half-court offense", "3-14 upsets happen ~15% of the time"],
+    aiAnalysis: "Michigan State under Izzo in the tournament is a different animal. They're physical, experienced, and the coach knows how to prepare for March. NDSU is a well-coached mid-major with upset DNA (they've done it before), but the talent gap is significant. Izzo's teams don't lose these games often. MSU should control the paint and pull away in the second half.",
+    bracketAdvice: "Lock Michigan State. Izzo in March against a 14-seed is one of the safest bets on the board."
+  },
+  {
+    gameId: 5, region: "WEST", site: "Portland, OR", day: "Thursday",
+    teamA: { name: "Wisconsin", seed: 5, winProb: 0.62, record: "24-10", coach: "Greg Gard", keyPlayer: "John Tonje", offEff: 113.5, defEff: 94.8 },
+    teamB: { name: "High Point", seed: 12, winProb: 0.38, record: "28-5", coach: "Tubby Smith", keyPlayer: "Abdoulaye Thiam", offEff: 109.2, defEff: 99.8 },
+    winner: "Wisconsin", confidence: 6, upsetRating: "upset-alert",
+    topReasons: ["Wisconsin's disciplined, slow-tempo style is proven in March", "Big Ten strength of schedule provides a significant experience edge", "Wisconsin's half-court defense limits easy looks"],
+    riskFactors: ["5-12 is the most famous upset line in March Madness (35% upset rate)", "High Point comes in hot with 28 wins and nothing to lose", "Tubby Smith's championship coaching pedigree shouldn't be underestimated", "Travel to Portland is equally far for both — no home-court advantage"],
+    aiAnalysis: "This is a PRIME 5-12 upset spot. High Point has a great record, is coached by a national champion in Tubby Smith, and has zero pressure. Wisconsin is solid but unspectacular — a Big Ten team that can grind you out but also go cold offensively. If High Point can keep this in the 60s, they have a real shot. Wisconsin's experience should prevail, but this is one of the most dangerous first-round matchups on the board.",
+    bracketAdvice: "UPSET ALERT. If you're picking one 12-over-5, this is a strong candidate. High Point + Tubby Smith is sneaky dangerous."
+  },
+  {
+    gameId: 6, region: "WEST", site: "Portland, OR", day: "Thursday",
+    teamA: { name: "Arkansas", seed: 4, winProb: 0.78, record: "26-8", coach: "John Calipari", keyPlayer: "Adou Thiero", offEff: 116.5, defEff: 94.2 },
+    teamB: { name: "Hawai'i", seed: 13, winProb: 0.22, record: "24-9", coach: "Eran Ganot", keyPlayer: "Tom Beattie", offEff: 107.5, defEff: 102.8 },
+    winner: "Arkansas", confidence: 7, upsetRating: "moderate-risk",
+    topReasons: ["Calipari's tournament experience is unmatched — four Final Fours, one title", "Arkansas's SEC talent and athleticism create a massive physical mismatch", "AP #14 ranking reflects genuine quality despite 8 losses"],
+    riskFactors: ["4-13 upsets happen 21% of the time — not negligible", "Portland is essentially neutral/slight Hawai'i territory (Pacific time, large Hawaiian diaspora in Oregon)", "Arkansas's new-look roster under Cal has occasional chemistry lapses"],
+    aiAnalysis: "Arkansas has the talent to cruise here, but Calipari's first-round track record isn't perfect — he's had a couple 4-13 scares. Hawai'i playing in Portland gets a quasi-home crowd bump. Still, the SEC talent advantage is significant. Arkansas's pace and athleticism should overwhelm Hawai'i in transition. Cal's teams usually figure it out by March.",
+    bracketAdvice: "Take Arkansas but be aware of the Portland location factor. Not the 4-13 upset I'd target."
+  },
+  {
+    gameId: 7, region: "WEST", site: "Portland, OR", day: "Thursday",
+    teamA: { name: "BYU", seed: 6, winProb: 0.55, record: "23-9", coach: "Kevin Young", keyPlayer: "Egor Demin", offEff: 114.2, defEff: 97.5 },
+    teamB: { name: "Texas", seed: 11, winProb: 0.45, record: "21-13", coach: "Rod Terry", keyPlayer: "Tre Johnson", offEff: 112.0, defEff: 96.8 },
+    winner: "BYU", confidence: 5, upsetRating: "upset-alert",
+    topReasons: ["BYU's Big 12 experience and higher seed give them a slight structural edge", "Egor Demin's NBA-level talent can take over a game", "BYU's 3-point shooting is elite — they can shoot you out of the gym"],
+    riskFactors: ["Texas has the SEC pedigree and blue-chip talent to match anyone", "Tre Johnson is a lottery pick who can dominate in single-elimination", "Texas's defensive athleticism is elite despite inconsistent season", "11-seeds have major upset equity — 37% historically"],
+    aiAnalysis: "This is effectively a pick'em dressed up as a 6-11 game. Texas has more raw talent with Tre Johnson, but their inconsistent season (21-13) landed them here as a bubble team or play-in survivor. BYU is steadier with better efficiency numbers but lacks Texas's explosive ceiling. Portland as a neutral site means neither team has a crowd advantage. This could go either way — classic March coin flip in a 6-11 skin.",
+    bracketAdvice: "UPSET ALERT. Texas's talent gives them a real shot. If you want a trendy 11-seed upset, this is it."
+  },
+  {
+    gameId: 8, region: "WEST", site: "Portland, OR", day: "Thursday",
+    teamA: { name: "Gonzaga", seed: 3, winProb: 0.90, record: "30-3", coach: "Mark Few", keyPlayer: "Khalif Battle", offEff: 121.8, defEff: 95.2 },
+    teamB: { name: "Kennesaw State", seed: 14, winProb: 0.10, record: "23-11", coach: "Amir Abdur-Rahim", keyPlayer: "Simeon Cottle", offEff: 103.5, defEff: 105.2 },
+    winner: "Gonzaga", confidence: 9, upsetRating: "very-unlikely",
+    topReasons: ["Gonzaga is AP #12 with a 30-3 record and elite offensive efficiency", "Mark Few is one of the best tournament coaches — Zags don't lose to 14-seeds", "Playing in Portland is basically a HOME game for Gonzaga — Spokane to Portland is a short trip and West Coast fans travel"],
+    riskFactors: ["3-14 upsets happen 15% of the time historically", "Gonzaga's WCC schedule raises questions about readiness for March physicality", "Kennesaw State has nothing to lose"],
+    aiAnalysis: "Gonzaga playing in Portland is practically a home game. The Zags faithful will flood the arena. Combine that with a 30-win team under Mark Few and an elite offense, and Kennesaw State faces a near-impossible task. Gonzaga's offensive firepower will overwhelm KSU's defense. This should be over by halftime.",
+    bracketAdvice: "Lock Gonzaga. The Portland location makes this the safest 3-seed on the board."
+  },
+  {
+    gameId: 9, region: "SOUTH", site: "Oklahoma City, OK", day: "Thursday",
+    teamA: { name: "Nebraska", seed: 4, winProb: 0.76, record: "26-6", coach: "Fred Hoiberg", keyPlayer: "Brice Williams", offEff: 115.8, defEff: 93.5 },
+    teamB: { name: "Troy", seed: 13, winProb: 0.24, record: "27-7", coach: "Scott Cross", keyPlayer: "Nelson Phillips", offEff: 106.8, defEff: 103.5 },
+    winner: "Nebraska", confidence: 7, upsetRating: "moderate-risk",
+    topReasons: ["Nebraska is AP #15 — their best team in decades with an elite 26-6 record", "Big Ten defensive identity and physicality will grind Troy down", "Fred Hoiberg's team is peaking at the right time"],
+    riskFactors: ["4-13 upset rate is 21% — one of the more common upset lines", "Nebraska lacks deep tournament experience as a program — pressure/moment factor", "Troy has zero pressure and could play loose and inspired"],
+    aiAnalysis: "Nebraska is the better team on paper and deserves its 4-seed, but this is a sneaky dangerous spot. Nebraska hasn't been relevant in March in decades — the pressure of expectations could be a factor. Troy is a Sun Belt champion with nothing to lose. The 4-13 line produces upsets every year. Still, Nebraska's defensive metrics and Big Ten toughness should carry them. But don't be surprised if this is closer than expected.",
+    bracketAdvice: "Nebraska should win, but if you're looking for a 4-13 upset, this is more plausible than most. Nebraska's tournament inexperience is real."
+  },
+  {
+    gameId: 10, region: "SOUTH", site: "Oklahoma City, OK", day: "Thursday",
+    teamA: { name: "Vanderbilt", seed: 5, winProb: 0.63, record: "26-8", coach: "Mark Byington", keyPlayer: "Jason Edwards", offEff: 115.0, defEff: 95.5 },
+    teamB: { name: "McNeese", seed: 12, winProb: 0.37, record: "29-4", coach: "Will Wade", keyPlayer: "Shahada Wells", offEff: 110.8, defEff: 99.5 },
+    winner: "Vanderbilt", confidence: 6, upsetRating: "upset-alert",
+    topReasons: ["Vanderbilt is AP #16 — a legitimate SEC contender with quality wins", "SEC schedule provides a massive preparation advantage over Southland opponents", "Vanderbilt's depth allows them to grind through a 40-minute game"],
+    riskFactors: ["5-12 is THE upset line — 35% upset rate historically", "McNeese's 29-4 record and momentum are dangerous", "Will Wade is a controversial but effective tournament coach", "McNeese can shoot the three at a high clip — 3-point variance can swing any game"],
+    aiAnalysis: "Another dangerous 5-12 spot. Vanderbilt had a breakout SEC season under Byington but has limited recent tournament experience as a program. McNeese under Will Wade is well-coached and enters with a 29-win season and house money mentality. The Southland-to-SEC talent gap is real, but McNeese's shooting and confidence could keep this competitive deep into the second half. Vanderbilt should have enough to survive, but this has all the markers of a potential upset.",
+    bracketAdvice: "UPSET ALERT. McNeese is the second-most dangerous 12-seed on the board. Vanderbilt's lack of tournament pedigree is a concern."
+  },
+  {
+    gameId: 11, region: "SOUTH", site: "Oklahoma City, OK", day: "Thursday",
+    teamA: { name: "Saint Mary's", seed: 7, winProb: 0.54, record: "27-5", coach: "Randy Bennett", keyPlayer: "Augustas Marciulionis", offEff: 116.5, defEff: 96.0 },
+    teamB: { name: "Texas A&M", seed: 10, winProb: 0.46, record: "21-13", coach: "Buzz Williams", keyPlayer: "Wade Taylor IV", offEff: 112.5, defEff: 96.8 },
+    winner: "Saint Mary's", confidence: 5, upsetRating: "toss-up",
+    topReasons: ["Saint Mary's is AP #22 with an elite 27-5 record and offensive efficiency", "Randy Bennett's deliberate pace and system neutralize athletic advantages", "Saint Mary's precision shooting from three is tournament-proven"],
+    riskFactors: ["Texas A&M's SEC schedule is astronomically harder than the WCC", "Buzz Williams' physical, defensive style could disrupt Saint Mary's rhythm", "7-10 games upset 39% of the time — almost a coin flip", "A&M's athleticism and size advantage is significant"],
+    aiAnalysis: "Classic style clash. Saint Mary's wants to play in the 60s with perfect half-court execution. Texas A&M wants to muck it up with SEC-level physicality and defense. The 7-10 line is basically a coin flip historically, and this game fits that profile. Saint Mary's higher efficiency numbers and better record give them the slight edge, but A&M's strength of schedule is dramatically superior. OKC is neutral territory. This one's going down to the wire.",
+    bracketAdvice: "Slight lean to Saint Mary's, but A&M's SEC pedigree makes this dangerous. Genuine 55/45 game."
+  },
+  {
+    gameId: 12, region: "SOUTH", site: "Oklahoma City, OK", day: "Thursday",
+    teamA: { name: "Houston", seed: 2, winProb: 0.95, record: "28-6", coach: "Kelvin Sampson", keyPlayer: "J'Wan Roberts", offEff: 118.2, defEff: 88.5 },
+    teamB: { name: "Idaho", seed: 15, winProb: 0.05, record: "24-9", coach: "Alex Pribble", keyPlayer: "Julius Mims", offEff: 103.0, defEff: 106.5 },
+    winner: "Houston", confidence: 9, upsetRating: "very-unlikely",
+    topReasons: ["Houston is AP #5 with the best defense in America — suffocating opponents all season", "Kelvin Sampson's tournament track record is outstanding — three straight Final Fours", "Playing in OKC is practically a home game — Houston is a 6-hour drive away"],
+    riskFactors: ["2-15 upsets happen 6% of the time — rare but not impossible", "Houston's offense can stagnate against zone defenses"],
+    aiAnalysis: "Houston's defense makes them nearly upset-proof. They hold opponents to one of the lowest efficiency marks in the country, and Kelvin Sampson's teams are built for March. Playing in OKC gives them a soft home-court edge. Idaho will compete hard but simply doesn't have the talent or depth to hang for 40 minutes against Houston's pressure. This should be comfortable.",
+    bracketAdvice: "Lock Houston. One of the safest 2-seeds on the board, especially with the OKC location."
+  },
+  {
+    gameId: 13, region: "SOUTH", site: "Greenville, SC", day: "Thursday",
+    teamA: { name: "North Carolina", seed: 6, winProb: 0.62, record: "24-8", coach: "Hubert Davis", keyPlayer: "RJ Davis", offEff: 115.8, defEff: 96.2 },
+    teamB: { name: "VCU", seed: 11, winProb: 0.38, record: "25-8", coach: "Ryan Odom", keyPlayer: "Max Shulga", offEff: 111.0, defEff: 97.0 },
+    winner: "North Carolina", confidence: 6, upsetRating: "moderate-risk",
+    topReasons: ["UNC is AP #21 with blue-blood talent and ACC battle-testing", "RJ Davis is one of the most experienced guards in college basketball", "Greenville, SC is basically home court for UNC — Carolina fans will pack the arena"],
+    riskFactors: ["VCU's trademark pressure defense (Havoc legacy) creates chaos and turnovers", "6-11 upset rate is 37% — very live", "UNC can get sloppy with turnovers against pressing teams", "VCU has March pedigree — 2011 Final Four, always dangerous"],
+    aiAnalysis: "UNC in Greenville is a massive location advantage — this is essentially a home game. That alone bumps their win probability. But VCU's pressing style is exactly the type of opponent that gives UNC trouble — the Tar Heels can get turnover-prone against aggressive defenses. Still, UNC's talent, experience (RJ Davis in his 6th year), and crowd advantage should be enough. VCU will make it ugly, but UNC should survive.",
+    bracketAdvice: "UNC benefits hugely from the Greenville location. Take the Tar Heels, but expect it to be stressful."
+  },
+  {
+    gameId: 14, region: "SOUTH", site: "Greenville, SC", day: "Thursday",
+    teamA: { name: "Illinois", seed: 3, winProb: 0.85, record: "24-8", coach: "Brad Underwood", keyPlayer: "Kasparas Jakucionis", offEff: 117.8, defEff: 94.5 },
+    teamB: { name: "Penn", seed: 14, winProb: 0.15, record: "23-7", coach: "Steve Donahue", keyPlayer: "Nick Spinoso", offEff: 105.5, defEff: 104.5 },
+    winner: "Illinois", confidence: 8, upsetRating: "unlikely",
+    topReasons: ["Illinois is AP #13 — a Big Ten powerhouse with elite offensive efficiency", "Kasparas Jakucionis is a projected lottery pick who can take over", "Penn's Ivy League schedule provides virtually no preparation for Big Ten-level physicality"],
+    riskFactors: ["3-14 upsets happen 15% of the time", "Penn's smart, disciplined play style can slow the game down and create variance", "Illinois has historically been upset-prone in March under Underwood"],
+    aiAnalysis: "Illinois should handle this comfortably. Jakucionis gives them a go-to scorer who can break down any defense, and their Big Ten schedule has prepared them for high-intensity basketball. Penn will try to slow the pace and execute in the half-court, but the talent gap is too significant. Illinois's biggest enemy here is themselves — if they come out flat, Penn could hang around. But the Illini's offensive firepower should create enough separation.",
+    bracketAdvice: "Take Illinois. Not the 3-14 upset I'd target this year."
+  },
+  {
+    gameId: 15, region: "MIDWEST", site: "Buffalo, NY", day: "Thursday",
+    teamA: { name: "Michigan", seed: 1, winProb: 0.99, record: "31-3", coach: "Dusty May", keyPlayer: "Bryce James", offEff: 122.8, defEff: 89.8 },
+    teamB: { name: "Howard", seed: 16, winProb: 0.01, record: "20-14", coach: "Kenny Blakeney", keyPlayer: "Bryce Harris", offEff: 100.5, defEff: 109.8 },
+    winner: "Michigan", confidence: 10, upsetRating: "near-impossible",
+    topReasons: ["Michigan is AP #3 with a 31-3 record — one of the best teams in the country", "Dusty May has transformed this program with elite talent and offensive efficiency", "The talent gap between a Big Ten champion and a MEAC champion is enormous"],
+    riskFactors: ["16-seeds have won twice — never say never", "Howard is an HBCU with a passionate fanbase that could bring energy"],
+    aiAnalysis: "Michigan is one of the three best teams in America and should cruise. Howard will compete hard and enjoy the moment, but this is a 30+ point KenPom gap. Michigan's offensive firepower will create separation early and never look back. Enjoy the atmosphere, but the outcome isn't in doubt.",
+    bracketAdvice: "Lock Michigan. One of the three safest picks on the entire bracket."
+  },
+  {
+    gameId: 16, region: "MIDWEST", site: "Buffalo, NY", day: "Thursday",
+    teamA: { name: "Georgia", seed: 8, winProb: 0.50, record: "21-12", coach: "Mike White", keyPlayer: "Blue Cain", offEff: 113.0, defEff: 96.5 },
+    teamB: { name: "Saint Louis", seed: 9, winProb: 0.50, record: "23-10", coach: "Josh Schertz", keyPlayer: "Gibson Jimerson", offEff: 112.8, defEff: 96.2 },
+    winner: "Saint Louis", confidence: 5, upsetRating: "toss-up",
+    topReasons: ["Saint Louis has the better record and has been more consistent down the stretch", "Jimerson is one of the best shooters in the A-10 — can get hot and win a game by himself", "Saint Louis's deliberate pace can neutralize Georgia's SEC athleticism"],
+    riskFactors: ["Georgia's SEC schedule makes them battle-tested", "Cain's ability to attack the rim gives Georgia an athletic edge", "8-9 games are genuinely unpredictable"],
+    aiAnalysis: "This is the truest coin flip on the board. Georgia brings SEC athleticism and toughness, while Saint Louis brings A-10 consistency and elite shooting. Neither team has significant tournament pedigree in recent years. I'm giving a slight lean to Saint Louis based on their better record and shooting ability, but this is literally a pick'em. Either team is equally likely to advance.",
+    bracketAdvice: "Pure coin flip. I'll take the mild 9-over-8 upset with Saint Louis for bracket diversity."
+  },
+  {
+    gameId: 17, region: "MIDWEST", site: "St. Louis, MO", day: "Friday",
+    teamA: { name: "Kentucky", seed: 7, winProb: 0.60, record: "21-12", coach: "Mark Pope", keyPlayer: "Otega Oweh", offEff: 114.5, defEff: 97.0 },
+    teamB: { name: "Santa Clara", seed: 10, winProb: 0.40, record: "25-8", coach: "Herb Sendek", keyPlayer: "Carlos Stewart", offEff: 112.0, defEff: 97.5 },
+    winner: "Kentucky", confidence: 5, upsetRating: "upset-alert",
+    topReasons: ["Kentucky's blue-blood brand and SEC talent provide a raw ability edge", "Pope's first full recruiting class has developed well in year 2", "UK's fanbase will travel heavily to St. Louis"],
+    riskFactors: ["Kentucky's 21-12 record is underwhelming for their talent level", "7-10 upset rate is 39% — extremely live", "Santa Clara comes in hot at 25-8 with better recent form", "Santa Clara's WCC experience includes games against Gonzaga and Saint Mary's"],
+    aiAnalysis: "Kentucky as a 7-seed is already underperforming expectations, which means either they're overrated or they've been inconsistent. Both are dangerous in March. Santa Clara at 25-8 is quietly excellent and has the discipline to hang in a tournament game. Kentucky's talent edge is real, but their 21-12 record suggests they can beat anyone or lose to anyone. This is one of the most likely upset spots on the board.",
+    bracketAdvice: "UPSET ALERT. Santa Clara over Kentucky is a sharp pick. Kentucky's inconsistency + 7-10 historical chaos = danger."
+  },
+  {
+    gameId: 18, region: "MIDWEST", site: "St. Louis, MO", day: "Friday",
+    teamA: { name: "Iowa State", seed: 2, winProb: 0.94, record: "27-7", coach: "T.J. Otzelberger", keyPlayer: "Keshon Gilbert", offEff: 117.5, defEff: 90.2 },
+    teamB: { name: "Tennessee State", seed: 15, winProb: 0.06, record: "21-12", coach: "Brian Collins", keyPlayer: "Derek Dixon", offEff: 101.5, defEff: 108.0 },
+    winner: "Iowa State", confidence: 9, upsetRating: "very-unlikely",
+    topReasons: ["Iowa State is AP #6 with elite defensive efficiency and a proven system", "Otzelberger's defensive scheme is specifically designed to strangle lower-seed offenses", "St. Louis is close enough for Iowa State fans to create a hostile environment"],
+    riskFactors: ["2-15 upsets happen 6% of the time", "Iowa State's Big 12 tournament run may have caused fatigue"],
+    aiAnalysis: "Iowa State's suffocating defense makes them one of the most upset-proof 2-seeds in the field. Tennessee State won their conference tournament to get here but faces a massive step up in competition. Iowa State will control tempo, force turnovers, and build a comfortable lead. This should be routine.",
+    bracketAdvice: "Lock Iowa State. Their defensive identity makes them very safe here."
+  },
+  {
+    gameId: 19, region: "MIDWEST", site: "Tampa, FL", day: "Friday",
+    teamA: { name: "Texas Tech", seed: 5, winProb: 0.66, record: "22-10", coach: "Grant McCasland", keyPlayer: "Darrion Williams", offEff: 113.2, defEff: 94.0 },
+    teamB: { name: "Akron", seed: 12, winProb: 0.34, record: "27-7", coach: "John Groce", keyPlayer: "Nate Johnson", offEff: 108.5, defEff: 100.0 },
+    winner: "Texas Tech", confidence: 6, upsetRating: "upset-alert",
+    topReasons: ["Texas Tech's Big 12 defensive identity and physicality should control the game", "AP #20 with the most complete two-way profile of any 5-seed", "Tech's experience against elite competition gives them a preparation edge"],
+    riskFactors: ["5-12 is THE upset line — 35% historical rate", "Texas Tech's 22-10 record is underwhelming for a 5-seed", "Akron's 27-7 record and MAC tournament run signal a team peaking at the right time", "McCasland is in his first year at Tech — team cohesion questions"],
+    aiAnalysis: "Texas Tech as a 5-seed with 10 losses is not inspiring confidence. Their Big 12 schedule inflated their profile, but 22-10 suggests a team capable of losing to anyone. Akron at 27-7 has the record and momentum of a typical 12-seed upset candidate. Tech's defensive DNA should carry them, but this is a legitimate 5-12 upset opportunity. The MAC conference tournament champion is battle-tested in its own way.",
+    bracketAdvice: "Texas Tech is vulnerable. This is a live 5-12 upset spot, though I lean Tech's defense winning a grinder."
+  },
+  {
+    gameId: 20, region: "MIDWEST", site: "Tampa, FL", day: "Friday",
+    teamA: { name: "Alabama", seed: 4, winProb: 0.80, record: "23-9", coach: "Nate Oats", keyPlayer: "Mark Sears", offEff: 117.0, defEff: 95.0 },
+    teamB: { name: "Hofstra", seed: 13, winProb: 0.20, record: "26-8", coach: "Speedy Claxton", keyPlayer: "Tyler Thomas", offEff: 107.0, defEff: 103.0 },
+    winner: "Alabama", confidence: 7, upsetRating: "moderate-risk",
+    topReasons: ["Alabama is AP #18 with the #1 strength of schedule in America", "Nate Oats' up-tempo system and Bama's athleticism overwhelm mid-major opponents", "Mark Sears is a proven tournament performer"],
+    riskFactors: ["4-13 upset rate is 21%", "Alabama's 3-point variance can work both ways — they live and die by the three", "Hofstra's 26-8 record shows a quality team with shooting ability", "Bama can occasionally play down to competition"],
+    aiAnalysis: "Alabama's offense is electric but volatile. When they shoot well from three, they're a Final Four contender. When they go cold, they can lose to anyone. Hofstra will try to slow the pace and keep this in the 60s, which is Alabama's worst-case scenario. Still, Bama's sheer athleticism and SEC-forged toughness should create enough separation. Oats knows how to prepare for March.",
+    bracketAdvice: "Alabama should advance, but their boom-or-bust offense introduces risk. Not the 4-13 upset I'd circle."
+  },
+  {
+    gameId: 21, region: "MIDWEST", site: "Philadelphia, PA", day: "Friday",
+    teamA: { name: "Virginia", seed: 3, winProb: 0.88, record: "29-5", coach: "Tony Bennett", keyPlayer: "Isaac McKneely", offEff: 115.5, defEff: 89.8 },
+    teamB: { name: "Wright State", seed: 14, winProb: 0.12, record: "24-9", coach: "Clint Sargent", keyPlayer: "Brandon Noel", offEff: 104.8, defEff: 104.0 },
+    winner: "Virginia", confidence: 9, upsetRating: "very-unlikely",
+    topReasons: ["Virginia is AP #9 with the best defense in college basketball — 89.8 defensive efficiency", "Tony Bennett's pack-line defense is specifically designed to strangle lower-seed offenses", "29-5 record reflects consistent excellence throughout the ACC season"],
+    riskFactors: ["Virginia famously lost to #16 UMBC in 2018 — they know how this can go wrong", "Virginia's slow pace creates variance — fewer possessions means fewer chances to pull away", "3-14 upset rate is 15%"],
+    aiAnalysis: "Virginia's defensive system is the ultimate March Madness weapon — or liability. It keeps games close by design, which theoretically gives the underdog more chances. But Bennett's teams rarely lose to significantly inferior opponents because they simply don't allow enough scoring. Wright State will struggle to crack 55 points against this defense. Virginia should grind this out with their typical 58-47 type score. The UMBC ghost adds a tiny bit of narrative spice, but this UVA team is built differently.",
+    bracketAdvice: "Lock Virginia. Their defensive ceiling makes them one of the safest 3-seeds on the board."
+  },
+  {
+    gameId: 22, region: "MIDWEST", site: "Philadelphia, PA", day: "Friday",
+    teamA: { name: "Tennessee", seed: 6, winProb: 0.64, record: "22-11", coach: "Rick Barnes", keyPlayer: "Chaz Lanier", offEff: 112.0, defEff: 94.8 },
+    teamB: { name: "Miami Ohio", seed: 11, winProb: 0.36, record: "24-9", coach: "Travis Steele", keyPlayer: "Peter Suder", offEff: 109.5, defEff: 97.5 },
+    winner: "Tennessee", confidence: 6, upsetRating: "moderate-risk",
+    topReasons: ["Tennessee is AP T-23 — an SEC team with major tournament experience under Barnes", "Rick Barnes' deep tournament resume gives Tennessee a coaching edge in close games", "SEC defensive toughness should control Miami Ohio's MAC-level offense"],
+    riskFactors: ["Tennessee's 22-11 record and 6-4 last-10 suggest a team that's been inconsistent", "6-11 upset rate is 37%", "Miami Ohio is a disciplined, well-coached team that won't beat themselves", "Barnes has been criticized for postseason underperformance at Tennessee"],
+    aiAnalysis: "Tennessee at 22-11 is a 6-seed that looks vulnerable. They've been inconsistent down the stretch and their offensive efficiency is underwhelming for an SEC team. Miami Ohio won the MAC and plays smart, disciplined basketball. This 6-11 matchup has upset written all over it if you squint, but Tennessee's defensive ceiling and Barnes' experience should be enough in a low-scoring affair. Don't be surprised if this goes to overtime.",
+    bracketAdvice: "Tennessee should survive, but this is a game I would not be shocked to see flip. Mild upset consideration."
+  },
+  {
+    gameId: 23, region: "SOUTH", site: "Tampa, FL", day: "Friday",
+    teamA: { name: "Clemson", seed: 8, winProb: 0.48, record: "21-12", coach: "Brad Brownell", keyPlayer: "Chase Hunter", offEff: 112.5, defEff: 96.0 },
+    teamB: { name: "Iowa", seed: 9, winProb: 0.52, record: "22-11", coach: "Fran McCaffery", keyPlayer: "Owen Freeman", offEff: 115.5, defEff: 98.0 },
+    winner: "Iowa", confidence: 5, upsetRating: "toss-up",
+    topReasons: ["Iowa's offensive efficiency is noticeably higher than Clemson's", "Freeman gives Iowa a dominant interior presence Clemson can't match", "Iowa's recent form (7-3 last 10) is significantly better than Clemson's 5-5"],
+    riskFactors: ["Clemson's ACC defensive identity can slow Iowa's offense", "8-9 games are genuine coin flips", "Brownell has tournament experience including a 2024 Elite Eight run"],
+    aiAnalysis: "Two similar teams with very different styles. Iowa wants to play fast and score in the 80s; Clemson wants to grind it out in the 60s. Whoever dictates tempo wins. I lean Iowa slightly because their offensive ceiling is higher and Freeman is a matchup problem. But Clemson's defense-first identity gives them a floor. This is a genuine toss-up with a slight Iowa lean based on form and offensive talent.",
+    bracketAdvice: "Mild 9-over-8 lean with Iowa. Their offensive firepower gives them the slight edge in a coin-flip game."
+  },
+  {
+    gameId: 24, region: "SOUTH", site: "Tampa, FL", day: "Friday",
+    teamA: { name: "Florida", seed: 1, winProb: 0.99, record: "26-7", coach: "Todd Golden", keyPlayer: "Walter Clayton Jr.", offEff: 120.5, defEff: 90.5 },
+    teamB: { name: "Prairie View A&M", seed: 16, winProb: 0.01, record: "19-15", coach: "Byron Smith", keyPlayer: "William Douglas", offEff: 99.5, defEff: 110.5 },
+    winner: "Florida", confidence: 10, upsetRating: "near-impossible",
+    topReasons: ["Florida is AP #4 and a 1-seed playing in Tampa — literally a home game", "The Gators' offensive and defensive efficiency are both top-10 nationally", "Prairie View A&M is 19-15 — the weakest 16-seed in the field"],
+    riskFactors: ["1-16 upsets have happened twice in history", "PVAMU could come out with nothing to lose and play freely"],
+    aiAnalysis: "This might be the single safest pick in the entire tournament. Florida is a 1-seed playing in Tampa — their home state, essentially a home game with Gator fans everywhere. Prairie View A&M enters with a losing record in conference play and got here through an automatic bid. The talent gap is cavernous. Florida should win by 30+.",
+    bracketAdvice: "The safest pick in the bracket. Florida in Tampa is as close to a guarantee as March Madness offers."
+  },
+  {
+    gameId: 25, region: "WEST", site: "San Diego, CA", day: "Friday",
+    teamA: { name: "Arizona", seed: 1, winProb: 0.99, record: "32-2", coach: "Tommy Lloyd", keyPlayer: "Jaden Bradley", offEff: 123.5, defEff: 88.5 },
+    teamB: { name: "Long Island", seed: 16, winProb: 0.01, record: "21-12", coach: "Rod Strickland", keyPlayer: "R.J. Greene", offEff: 100.8, defEff: 109.5 },
+    winner: "Arizona", confidence: 10, upsetRating: "near-impossible",
+    topReasons: ["Arizona is AP #2 with a 32-2 record — the second-best team in America", "Playing in San Diego is a de facto home game for Arizona — Pac-12 territory", "Tommy Lloyd's offense is the most efficient in the country"],
+    riskFactors: ["1-16 upsets exist (UMBC 2018, FDU 2023)", "That's about it"],
+    aiAnalysis: "Arizona matches Duke as the most dominant team in the field with an identical 32-2 record. Playing in San Diego gives them a massive home-crowd advantage. Long Island has no realistic path to an upset here. Arizona's offensive firepower will create a 20-point lead by halftime. Lock and move on.",
+    bracketAdvice: "Lock Arizona. They're co-favorites to win the whole tournament."
+  },
+  {
+    gameId: 26, region: "WEST", site: "San Diego, CA", day: "Friday",
+    teamA: { name: "Villanova", seed: 8, winProb: 0.53, record: "22-11", coach: "Kyle Neptune", keyPlayer: "Eric Dixon", offEff: 114.0, defEff: 96.5 },
+    teamB: { name: "Utah State", seed: 9, winProb: 0.47, record: "26-7", coach: "Jerrod Calhoun", keyPlayer: "Mason Falslev", offEff: 113.5, defEff: 97.0 },
+    winner: "Villanova", confidence: 5, upsetRating: "toss-up",
+    topReasons: ["Villanova's Big East schedule provides superior preparation for tournament intensity", "Dixon is one of the most matchup-proof players in college basketball — can score from anywhere", "Nova's tournament DNA and brand still carry weight in March"],
+    riskFactors: ["Utah State's 26-7 record is significantly better than Villanova's 22-11", "8-9 games are coin flips — and Utah State might actually be the better team", "San Diego is much closer to Logan, UT than to Philadelphia", "Falslev is a dynamic guard who can take over games"],
+    aiAnalysis: "This is a sneaky good game. Utah State at 26-7 arguably has a stronger case for the higher seed than Villanova at 22-11, but the Big East name brand carries weight with the committee. Dixon gives Villanova a go-to scorer, but Utah State is more complete and better rested. I lean Villanova slightly based on Big East toughness and Dixon's ability to take over, but this is genuinely a coin flip. Utah State has a real case to be the favorite here.",
+    bracketAdvice: "Coin flip. Villanova gets the slightest edge for Dixon's dominance, but Utah State at 26-7 is being disrespected as a 9."
+  },
+  {
+    gameId: 27, region: "WEST", site: "St. Louis, MO", day: "Friday",
+    teamA: { name: "Purdue", seed: 2, winProb: 0.93, record: "27-8", coach: "Matt Painter", keyPlayer: "Trey Kaufman-Renn", offEff: 119.0, defEff: 92.5 },
+    teamB: { name: "Queens", seed: 15, winProb: 0.07, record: "25-8", coach: "Bart Lundy", keyPlayer: "Jalen Jordan", offEff: 103.5, defEff: 107.0 },
+    winner: "Purdue", confidence: 9, upsetRating: "very-unlikely",
+    topReasons: ["Purdue is AP #8 — a Big Ten powerhouse with proven offensive efficiency", "Kaufman-Renn's interior dominance creates matchup problems Queens can't solve", "Matt Painter's tournament experience and preparation are elite"],
+    riskFactors: ["Purdue infamously lost to #16 FDU in 2023 — tournament trauma exists", "Queens is a relatively unknown commodity — less scouting material available", "2-15 upsets happen 6% of the time"],
+    aiAnalysis: "Purdue should handle this comfortably, but the FDU ghost from 2023 lingers. That said, this Purdue team is more balanced and experienced. Kaufman-Renn gives them a dominant interior force that Queens simply can't match. Queens is making their first D1 tournament appearance after transitioning from D2. The stage might be too big. Purdue by 20+.",
+    bracketAdvice: "Lock Purdue, but acknowledge the cosmic irony if they somehow lose to another 15-seed. They won't."
+  },
+  {
+    gameId: 28, region: "WEST", site: "St. Louis, MO", day: "Friday",
+    teamA: { name: "Miami Fla", seed: 7, winProb: 0.56, record: "25-8", coach: "Jim Larrañaga", keyPlayer: "Nijel Pack", offEff: 114.8, defEff: 96.5 },
+    teamB: { name: "Missouri", seed: 10, winProb: 0.44, record: "22-12", coach: "Dennis Gates", keyPlayer: "Tamar Bates", offEff: 113.0, defEff: 97.5 },
+    winner: "Miami Fla", confidence: 5, upsetRating: "upset-alert",
+    topReasons: ["Miami is AP #25 with the better record and more proven system under Larrañaga", "Pack is one of the best guards in the ACC — can take over in crunch time", "Larrañaga's 2023 Final Four run shows he knows how to win in March"],
+    riskFactors: ["St. Louis is Missouri's backyard — massive crowd advantage for Mizzou", "7-10 upset rate is 39%", "Missouri's SEC schedule is tougher than Miami's ACC this year", "Gates' physical style could bother Miami's finesse-oriented offense"],
+    aiAnalysis: "This is a classic 7-10 toss-up with a location wrinkle. Missouri playing in St. Louis is essentially a home game — Tiger fans will pack the arena. That alone makes this incredibly dangerous for Miami. Larrañaga and Pack give Miami the coaching and star-player edge, but the crowd factor is real. This game will likely come down to the final possession. I lean Miami for their superior metrics, but Missouri's home-court advantage makes this nearly a pick'em.",
+    bracketAdvice: "UPSET ALERT. Missouri in St. Louis has massive home-court energy. This is one of the best value upset picks on the board."
+  },
+  {
+    gameId: 29, region: "EAST", site: "San Diego, CA", day: "Friday",
+    teamA: { name: "St. John's", seed: 5, winProb: 0.68, record: "28-6", coach: "Rick Pitino", keyPlayer: "RJ Luis Jr.", offEff: 116.0, defEff: 94.2 },
+    teamB: { name: "UNI", seed: 12, winProb: 0.32, record: "25-8", coach: "Ben Jacobson", keyPlayer: "Trey Campbell", offEff: 108.0, defEff: 100.5 },
+    winner: "St. John's", confidence: 7, upsetRating: "moderate-risk",
+    topReasons: ["St. John's is AP #10 — the best season in program history under Pitino", "Rick Pitino is one of the greatest tournament coaches ever — two national titles", "28-6 record reflects a team that's been elite all season, not just at the end"],
+    riskFactors: ["5-12 is the most dangerous upset line (35%)", "UNI has March Madness upset pedigree (Ali Farokhmanesh's shot in 2010)", "San Diego is far from NYC — limited fan travel for St. John's", "UNI's Missouri Valley physical style can frustrate finesse teams"],
+    aiAnalysis: "St. John's is the safest 5-seed on the board. At 28-6 and AP #10, they're overseeded — this is really a 3 or 4-seed team stuck at the 5 line. Pitino's tournament pedigree adds another layer of security. UNI will try to slow this down and make it ugly, and they have the program DNA to pull off March upsets (2010 never dies). But St. John's is too talented and too well-coached. Pitino won't let them sleepwalk.",
+    bracketAdvice: "St. John's is the safest 5-seed. Pitino in March with a 28-win team? Take it and move on."
+  },
+  {
+    gameId: 30, region: "EAST", site: "San Diego, CA", day: "Friday",
+    teamA: { name: "Kansas", seed: 4, winProb: 0.77, record: "23-10", coach: "Bill Self", keyPlayer: "Hunter Dickinson", offEff: 116.0, defEff: 95.0 },
+    teamB: { name: "Cal Baptist", seed: 13, winProb: 0.23, record: "26-7", coach: "Rick Croy", keyPlayer: "Dominique Clifford", offEff: 107.2, defEff: 103.2 },
+    winner: "Kansas", confidence: 7, upsetRating: "moderate-risk",
+    topReasons: ["Bill Self is the most accomplished active tournament coach — 2022 national champion", "Kansas is AP #17 with the 5th-toughest schedule in America", "Dickinson gives Kansas a dominant post presence that CBU can't match"],
+    riskFactors: ["Kansas at 23-10 is an underwhelming 4-seed — 10 losses signal vulnerability", "Cal Baptist playing in San Diego is essentially a home game (45 min drive from Riverside)", "4-13 upset rate is 21%", "Kansas's 6-4 last-10 shows inconsistency heading into the tournament"],
+    aiAnalysis: "Kansas at 23-10 is the most vulnerable 4-seed in the field, and Cal Baptist in San Diego has a massive location advantage. CBU's campus is a short drive from San Diego — they'll have a raucous home crowd. Self's tournament experience is the equalizer, and Dickinson's size creates a mismatch CBU can't solve. But if Kansas comes out flat and CBU gets hot from three in front of their home fans, this could be the 4-13 upset of the tournament. This is the single most dangerous 4-13 matchup.",
+    bracketAdvice: "UPSET WATCH. If you're picking one 4-13 upset, Kansas/Cal Baptist in San Diego is the one. KU at 23-10 + CBU's home crowd = chaos potential."
+  },
+  {
+    gameId: 31, region: "EAST", site: "Philadelphia, PA", day: "Friday",
+    teamA: { name: "UCLA", seed: 7, winProb: 0.55, record: "22-10", coach: "Mick Cronin", keyPlayer: "Tyler Bilodeau", offEff: 113.5, defEff: 96.8 },
+    teamB: { name: "UCF", seed: 10, winProb: 0.45, record: "23-10", coach: "Johnny Dawkins", keyPlayer: "Jordan Ivy-Curry", offEff: 112.0, defEff: 97.0 },
+    winner: "UCLA", confidence: 5, upsetRating: "upset-alert",
+    topReasons: ["UCLA's Big Ten schedule provides superior preparation for March intensity", "Cronin's teams are built for March — physical, defensive, and disciplined", "UCLA's brand and experience in big games gives them a mental edge"],
+    riskFactors: ["7-10 games upset 39% of the time", "UCF has similar metrics and a stronger recent form (7-3 vs 6-4 last 10)", "Philadelphia is neutral — no crowd advantage for either team", "UCLA's move to Big Ten has been an adjustment — inconsistency lingers"],
+    aiAnalysis: "Another 7-10 that's essentially a pick'em. UCLA and UCF have nearly identical profiles — both hovering around .680 winning percentage with similar efficiency numbers. UCLA gets the slight edge for Cronin's defensive identity and Big Ten toughness, but UCF's better recent form and comparable talent make this very competitive. This will be a physical, low-scoring affair that comes down to the final minutes.",
+    bracketAdvice: "Slight lean UCLA, but UCF is a perfectly reasonable upset pick. Classic 7-10 coin flip."
+  },
+  {
+    gameId: 32, region: "EAST", site: "Philadelphia, PA", day: "Friday",
+    teamA: { name: "UConn", seed: 2, winProb: 0.94, record: "29-5", coach: "Dan Hurley", keyPlayer: "Alex Karaban", offEff: 119.5, defEff: 91.0 },
+    teamB: { name: "Furman", seed: 15, winProb: 0.06, record: "25-9", coach: "Bob Richey", keyPlayer: "Marcus Foster", offEff: 105.0, defEff: 105.5 },
+    winner: "UConn", confidence: 9, upsetRating: "very-unlikely",
+    topReasons: ["UConn is the back-to-back defending national champion (2023, 2024) and AP #7", "Dan Hurley's tournament DNA is unmatched — going for a three-peat legacy", "29-5 record with elite two-way metrics makes UConn one of the most complete teams"],
+    riskFactors: ["Furman upset Virginia in the 2023 tournament — they have March Madness upset DNA", "2-15 upsets happen 6% of the time", "UConn's Big East schedule may not have fully prepared them for Southern Conference grit"],
+    aiAnalysis: "UConn going for three straight titles is one of the best storylines in tournament history. Furman has their own March DNA (that 2023 Virginia upset), but UConn under Hurley is a different beast. Karaban's versatility and Hurley's preparation make UConn extremely difficult to upset. Furman will compete — SoCon champions always play hard — but the talent gap is too wide. UConn should pull away in the second half.",
+    bracketAdvice: "Lock UConn. The defending champions don't lose to 15-seeds when they're healthy and focused."
+  },
 ];
 
-function buildRegionMatchups(regionTeams: Team[]): Matchup[] {
-  const byS: Record<number, Team> = {};
-  regionTeams.forEach((t) => (byS[t.seed] = t));
+// ─── Organize matchups by region in bracket order ───────────────────────────
+// Standard bracket order: 1v16, 8v9, 5v12, 4v13, 6v11, 3v14, 7v10, 2v15
+const BRACKET_ORDER = [[1,16],[8,9],[5,12],[4,13],[6,11],[3,14],[7,10],[2,15]];
 
-  return SEED_MATCHUP_ORDER.map(([sA, sB], i) => ({
-    id: `r64-${i}`,
-    round: 0,
-    position: i,
-    teamA: byS[sA] || null,
-    teamB: byS[sB] || null,
-    winner: null,
-  }));
+function getRegionMatchups(region: string): Prediction[] {
+  const regionPreds = PREDICTIONS.filter(p => p.region === region);
+  return BRACKET_ORDER.map(([sA, sB]) => {
+    return regionPreds.find(p =>
+      (p.teamA.seed === sA && p.teamB.seed === sB) ||
+      (p.teamA.seed === sB && p.teamB.seed === sA)
+    )!;
+  }).filter(Boolean);
+}
+
+// ─── Top Upsets ─────────────────────────────────────────────────────────────
+const TOP_UPSETS = [
+  { matchup: "(11) Texas over (6) BYU", prob: "45%", reason: "Tre Johnson is a lottery pick on an 11-seed — absurd talent for this line" },
+  { matchup: "(10) Missouri over (7) Miami Fla", prob: "44%", reason: "Mizzou playing in St. Louis is a home game — massive crowd advantage" },
+  { matchup: "(10) Santa Clara over (7) Kentucky", prob: "40%", reason: "Kentucky at 21-12 is one of the weakest 7-seeds; Santa Clara at 25-8 is better" },
+  { matchup: "(12) High Point over (5) Wisconsin", prob: "38%", reason: "Tubby Smith + 28-5 record + 5-12 historical magic = danger" },
+  { matchup: "(12) McNeese over (5) Vanderbilt", prob: "37%", reason: "29-4 record, Will Wade coaching, zero pressure — classic 12-seed upset" },
+];
+
+// ─── Bracket Strategies ─────────────────────────────────────────────────────
+const STRATEGIES = {
+  conservative: {
+    label: "🟢 Conservative",
+    subtitle: "Win Your Office Pool",
+    upsets: 3,
+    expectedCorrect: "25-27",
+    picks: [
+      "(9) Saint Louis over (8) Georgia — coin flip, take the hotter team",
+      "(9) Iowa over (8) Clemson — Iowa's offense is better, lean into it",
+      "(10) Missouri over (7) Miami Fla — home-court advantage in St. Louis is massive",
+    ],
+    advice: "All other games: CHALK. Take every 1, 2, 3, 4, 5, and 6 seed. The math says chalk wins more total games.",
+  },
+  balanced: {
+    label: "🟡 Balanced",
+    subtitle: "Best Risk/Reward",
+    upsets: 7,
+    expectedCorrect: "23-26",
+    picks: [
+      "(9) Saint Louis over (8) Georgia ✅",
+      "(9) Iowa over (8) Clemson ✅",
+      "(10) Missouri over (7) Miami Fla ✅",
+      "(10) Santa Clara over (7) Kentucky ⬆️",
+      "(11) Texas over (6) BYU ⬆️",
+      "(12) High Point over (5) Wisconsin ⬆️",
+      "(12) McNeese over (5) Vanderbilt ⬆️ (optional)",
+    ],
+    advice: "Keep chalk on all 1-seeds, all 2-seeds, all 3-seeds, Kansas, Arkansas, Nebraska, Alabama, St. John's.",
+  },
+  contrarian: {
+    label: "🔴 Contrarian",
+    subtitle: "Large Pool / High Ceiling",
+    upsets: 11,
+    expectedCorrect: "19-23",
+    picks: [
+      "(9) Saint Louis over (8) Georgia ✅",
+      "(9) Iowa over (8) Clemson ✅",
+      "(9) Utah State over (8) Villanova ⬆️",
+      "(10) Missouri over (7) Miami Fla ✅",
+      "(10) Santa Clara over (7) Kentucky ⬆️",
+      "(10) UCF over (7) UCLA ⬆️",
+      "(11) Texas over (6) BYU ⬆️",
+      "(12) High Point over (5) Wisconsin ⬆️",
+      "(12) McNeese over (5) Vanderbilt ⬆️",
+      "(13) Cal Baptist over (4) Kansas ⬆️",
+      "(13) Troy over (4) Nebraska ⬆️ (chaos pick)",
+    ],
+    advice: "Keep chalk on all 1-seeds, all 2-seeds, Gonzaga, MSU, Virginia, Illinois, St. John's, Arkansas, Alabama.",
+  },
+};
+
+// ─── Seed color ─────────────────────────────────────────────────────────────
+function seedColor(seed: number): string {
+  if (seed <= 4) return "#16A34A";
+  if (seed <= 8) return "#3B82F6";
+  if (seed <= 12) return "#D97706";
+  return "#DC2626";
+}
+
+function seedBg(seed: number): string {
+  if (seed <= 4) return "#DCFCE7";
+  if (seed <= 8) return "#DBEAFE";
+  if (seed <= 12) return "#FEF3C7";
+  return "#FEE2E2";
+}
+
+function upsetBadgeColor(rating: string): { bg: string; text: string; border: string } {
+  switch (rating) {
+    case "near-impossible": return { bg: "#DCFCE7", text: "#166534", border: "#BBF7D0" };
+    case "very-unlikely": return { bg: "#DCFCE7", text: "#166534", border: "#BBF7D0" };
+    case "unlikely": return { bg: "#DBEAFE", text: "#1E40AF", border: "#BFDBFE" };
+    case "moderate-risk": return { bg: "#FEF3C7", text: "#92400E", border: "#FDE68A" };
+    case "upset-alert": return { bg: "#FEE2E2", text: "#991B1B", border: "#FECACA" };
+    case "toss-up": return { bg: "#FEF3C7", text: "#92400E", border: "#FDE68A" };
+    default: return { bg: "#F3F4F6", text: "#374151", border: "#E5E7EB" };
+  }
+}
+
+function upsetLabel(rating: string): string {
+  switch (rating) {
+    case "near-impossible": return "🔒 LOCK";
+    case "very-unlikely": return "🔒 SAFE";
+    case "unlikely": return "✅ LIKELY";
+    case "moderate-risk": return "⚠️ MODERATE";
+    case "upset-alert": return "🚨 UPSET ALERT";
+    case "toss-up": return "🔄 TOSS-UP";
+    default: return rating;
+  }
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────
 export default function MarchMadnessBracket() {
-  const [activeTab, setActiveTab] = useState<string>("SOUTH");
-  const [picks, setPicks] = useState<Record<string, Record<string, Team>>>({});
-  const [modalMatchup, setModalMatchup] = useState<{ region: string; round: number; pos: number } | null>(null);
+  const [activeRegion, setActiveRegion] = useState("EAST");
+  const [selectedGame, setSelectedGame] = useState<Prediction | null>(null);
+  const [strategyTab, setStrategyTab] = useState<"conservative" | "balanced" | "contrarian">("balanced");
+  const [view, setView] = useState<"bracket" | "upsets" | "strategy">("bracket");
 
   const regionNames = ["EAST", "WEST", "SOUTH", "MIDWEST"];
 
-  // Build all rounds for a given region
-  const getRegionBracket = useCallback(
-    (region: string) => {
-      const teams = REGIONS[region];
-      if (!teams) return { rounds: [] as Matchup[][] };
+  const currentMatchups = useMemo(() => getRegionMatchups(activeRegion), [activeRegion]);
 
-      const r64 = buildRegionMatchups(teams);
-      const rPicks = picks[region] || {};
+  // ─── Matchup Card ─────────────────────────────────────────────────────
+  const MatchupCard = ({ pred }: { pred: Prediction }) => {
+    const badge = upsetBadgeColor(pred.upsetRating);
+    const isUpsetPick = pred.winner === pred.teamB.name && pred.teamB.seed > pred.teamA.seed;
+    const favTeam = pred.teamA.seed < pred.teamB.seed ? pred.teamA : pred.teamB;
+    const dogTeam = pred.teamA.seed < pred.teamB.seed ? pred.teamB : pred.teamA;
 
-      // Apply picks to R64
-      r64.forEach((m) => {
-        const pickKey = `0-${m.position}`;
-        if (rPicks[pickKey]) m.winner = rPicks[pickKey];
-      });
+    return (
+      <div
+        onClick={() => setSelectedGame(pred)}
+        className="rounded-xl border cursor-pointer transition-all hover:shadow-lg hover:border-blue-400 hover:-translate-y-0.5"
+        style={{ backgroundColor: "#F5F5F7", borderColor: "#E5E5E7" }}
+      >
+        <div className="p-4">
+          {/* Header row */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium" style={{ color: "#6B7280" }}>
+                {pred.site} · {pred.day}
+              </span>
+            </div>
+            <span
+              className="text-xs font-bold px-2 py-0.5 rounded-full border"
+              style={{ backgroundColor: badge.bg, color: badge.text, borderColor: badge.border }}
+            >
+              {upsetLabel(pred.upsetRating)}
+            </span>
+          </div>
 
-      const rounds: Matchup[][] = [r64];
+          {/* Team A */}
+          <div className="flex items-center gap-3 mb-2">
+            <img
+              src={`https://a.espncdn.com/i/teamlogos/ncaa/500/${ESPN_IDS[pred.teamA.name] || 0}.png`}
+              alt="" className="w-8 h-8 object-contain flex-shrink-0"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+            <span
+              className="text-xs font-bold w-6 h-6 rounded flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: seedBg(pred.teamA.seed), color: seedColor(pred.teamA.seed) }}
+            >
+              {pred.teamA.seed}
+            </span>
+            <span className="font-semibold text-sm flex-1" style={{ color: "#1A1A1A" }}>
+              {pred.teamA.name}
+            </span>
+            <span className="text-sm font-bold" style={{ color: pred.winner === pred.teamA.name ? "#3B82F6" : "#9CA3AF" }}>
+              {(pred.teamA.winProb * 100).toFixed(0)}%
+            </span>
+          </div>
 
-      // Build subsequent rounds
-      for (let round = 1; round <= 3; round++) {
-        const prev = rounds[round - 1];
-        const curr: Matchup[] = [];
-        for (let i = 0; i < prev.length; i += 2) {
-          const pos = i / 2;
-          const tA = prev[i].winner;
-          const tB = prev[i + 1]?.winner ?? null;
-          const pickKey = `${round}-${pos}`;
-          curr.push({
-            id: `r${round}-${pos}`,
-            round,
-            position: pos,
-            teamA: tA,
-            teamB: tB,
-            winner: rPicks[pickKey] || null,
-          });
-        }
-        rounds.push(curr);
-      }
+          {/* Probability bar */}
+          <div className="h-2 rounded-full overflow-hidden flex mx-11 mb-2" style={{ backgroundColor: "#E5E5E7" }}>
+            <div className="h-full rounded-l-full transition-all" style={{ width: `${pred.teamA.winProb * 100}%`, backgroundColor: "#3B82F6" }} />
+            <div className="h-full rounded-r-full transition-all" style={{ width: `${pred.teamB.winProb * 100}%`, backgroundColor: "#F59E0B" }} />
+          </div>
 
-      return { rounds };
-    },
-    [picks]
-  );
+          {/* Team B */}
+          <div className="flex items-center gap-3">
+            <img
+              src={`https://a.espncdn.com/i/teamlogos/ncaa/500/${ESPN_IDS[pred.teamB.name] || 0}.png`}
+              alt="" className="w-8 h-8 object-contain flex-shrink-0"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+            <span
+              className="text-xs font-bold w-6 h-6 rounded flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: seedBg(pred.teamB.seed), color: seedColor(pred.teamB.seed) }}
+            >
+              {pred.teamB.seed}
+            </span>
+            <span className="font-semibold text-sm flex-1" style={{ color: "#1A1A1A" }}>
+              {pred.teamB.name}
+            </span>
+            <span className="text-sm font-bold" style={{ color: pred.winner === pred.teamB.name ? "#F59E0B" : "#9CA3AF" }}>
+              {(pred.teamB.winProb * 100).toFixed(0)}%
+            </span>
+          </div>
 
-  // Final Four data
-  const getFinalFour = useCallback(() => {
-    const regionOrder = ["SOUTH", "WEST", "EAST", "MIDWEST"];
-    const eliteWinners = regionOrder.map((r) => {
-      const p = picks[r] || {};
-      return p["3-0"] || null;
-    });
+          {/* Pick indicator */}
+          <div className="mt-3 pt-3 flex items-center justify-between" style={{ borderTop: "1px solid #E5E5E7" }}>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs" style={{ color: "#6B7280" }}>AI Pick:</span>
+              <span className="text-xs font-bold" style={{ color: isUpsetPick ? "#F59E0B" : "#3B82F6" }}>
+                {isUpsetPick ? "⬆️ " : ""}({pred.winner === pred.teamA.name ? pred.teamA.seed : pred.teamB.seed}) {pred.winner}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-xs" style={{ color: "#6B7280" }}>Confidence:</span>
+              <div className="flex gap-0.5">
+                {Array.from({ length: 10 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="w-1.5 h-3 rounded-sm"
+                    style={{ backgroundColor: i < pred.confidence ? "#3B82F6" : "#E5E5E7" }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
-    const ffPicks = picks["FINAL_FOUR"] || {};
-
-    const semi1: Matchup = {
-      id: "ff-0", round: 4, position: 0,
-      teamA: eliteWinners[0], teamB: eliteWinners[1],
-      winner: ffPicks["4-0"] || null,
-    };
-    const semi2: Matchup = {
-      id: "ff-1", round: 4, position: 1,
-      teamA: eliteWinners[2], teamB: eliteWinners[3],
-      winner: ffPicks["4-1"] || null,
-    };
-    const champ: Matchup = {
-      id: "ff-champ", round: 5, position: 0,
-      teamA: semi1.winner, teamB: semi2.winner,
-      winner: ffPicks["5-0"] || null,
-    };
-
-    return { semi1, semi2, champ, eliteWinners, regionOrder };
-  }, [picks]);
-
-  const handlePick = useCallback(
-    (region: string, round: number, position: number, team: Team) => {
-      setPicks((prev) => {
-        const rPicks = { ...(prev[region] || {}) };
-        const key = `${round}-${position}`;
-        rPicks[key] = team;
-
-        // Clear downstream picks that depended on a different winner
-        const clearDownstream = (r: number, p: number) => {
-          const nextR = r + 1;
-          const nextP = Math.floor(p / 2);
-          const nextKey = `${nextR}-${nextP}`;
-          if (rPicks[nextKey]) {
-            delete rPicks[nextKey];
-            clearDownstream(nextR, nextP);
-          }
-        };
-        clearDownstream(round, position);
-
-        return { ...prev, [region]: rPicks };
-      });
-      setModalMatchup(null);
-    },
-    []
-  );
-
-  const roundLabels = ["ROUND OF 64", "ROUND OF 32", "SWEET 16", "ELITE EIGHT"];
-
-  // ─── Modal ────────────────────────────────────────────────────────────
+  // ─── Detail Modal ─────────────────────────────────────────────────────
   const renderModal = () => {
-    if (!modalMatchup) return null;
-    const { region, round, pos } = modalMatchup;
-
-    let matchup: Matchup | null = null;
-    let pickRegion = region;
-
-    if (region === "FINAL_FOUR") {
-      const ff = getFinalFour();
-      if (round === 4) matchup = pos === 0 ? ff.semi1 : ff.semi2;
-      else matchup = ff.champ;
-      pickRegion = "FINAL_FOUR";
-    } else {
-      const bracket = getRegionBracket(region);
-      matchup = bracket.rounds[round]?.[pos] ?? null;
-    }
-
-    if (!matchup || !matchup.teamA || !matchup.teamB) return null;
-
-    const a = matchup.teamA;
-    const b = matchup.teamB;
-    const analysis = computeAnalysis(a, b);
+    if (!selectedGame) return null;
+    const g = selectedGame;
+    const badge = upsetBadgeColor(g.upsetRating);
 
     return (
       <div
         className="fixed inset-0 z-50 flex items-center justify-center p-4"
-        style={{ backgroundColor: "rgba(0,0,0,0.75)" }}
-        onClick={() => setModalMatchup(null)}
+        style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+        onClick={() => setSelectedGame(null)}
       >
         <div
-          className="w-full max-w-lg rounded-xl border border-gray-700 p-6"
-          style={{ backgroundColor: "#141418" }}
+          className="w-full max-w-lg rounded-2xl border shadow-2xl max-h-[90vh] overflow-y-auto"
+          style={{ backgroundColor: "#FFFFFF", borderColor: "#E5E5E7" }}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header */}
-          <div className="mb-4 text-center">
-            <div className="text-xs font-bold tracking-widest text-blue-400 mb-1">
-              {region === "FINAL_FOUR"
-                ? round === 5
-                  ? "NATIONAL CHAMPIONSHIP"
-                  : "FINAL FOUR"
-                : roundLabels[round] || ""}
-            </div>
-            <div className="text-lg font-bold text-white">
-              ({a.seed}) {a.name} vs ({b.seed}) {b.name}
-            </div>
-          </div>
-
-          {/* Probability bar */}
-          <div className="mb-4">
-            <div className="flex justify-between text-sm mb-1">
-              <span className="text-blue-400 font-semibold">{a.name} {(analysis.winProbA * 100).toFixed(0)}%</span>
-              <span className="text-orange-400 font-semibold">{(analysis.winProbB * 100).toFixed(0)}% {b.name}</span>
-            </div>
-            <div className="h-3 rounded-full overflow-hidden bg-gray-700 flex">
-              <div
-                className="h-full transition-all"
-                style={{
-                  width: `${analysis.winProbA * 100}%`,
-                  background: "linear-gradient(90deg, #3B82F6, #60A5FA)",
-                }}
-              />
-              <div
-                className="h-full transition-all"
-                style={{
-                  width: `${analysis.winProbB * 100}%`,
-                  background: "linear-gradient(90deg, #F97316, #FB923C)",
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Key factors */}
-          <div className="mb-4 space-y-2">
-            <div className="text-xs font-bold text-gray-400 tracking-wider">KEY FACTORS</div>
-            {analysis.factors.map((f, i) => (
-              <div key={i} className="flex items-start gap-2 text-sm text-gray-300">
-                <span className="text-yellow-400 mt-0.5">▸</span>
-                <span>{f}</span>
+          <div className="p-6">
+            {/* Header */}
+            <div className="text-center mb-4">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <span className="text-xs font-medium px-2 py-0.5 rounded" style={{ backgroundColor: "#F5F5F7", color: "#6B7280" }}>
+                  {g.region} · {g.site}
+                </span>
+                <span className="text-xs font-medium px-2 py-0.5 rounded" style={{ backgroundColor: "#F5F5F7", color: "#6B7280" }}>
+                  {g.day}
+                </span>
               </div>
-            ))}
-          </div>
+              <h3 className="text-lg font-bold" style={{ color: "#1A1A1A" }}>
+                ({g.teamA.seed}) {g.teamA.name} vs ({g.teamB.seed}) {g.teamB.name}
+              </h3>
+            </div>
 
-          {/* AI Analysis */}
-          <div className="mb-5 rounded-lg p-3 border border-gray-600" style={{ backgroundColor: "#1a1a1f" }}>
-            <div className="text-xs font-bold text-gray-400 tracking-wider mb-1">AI ANALYSIS</div>
-            <p className="text-sm text-gray-300 leading-relaxed">{analysis.analysis}</p>
-          </div>
-
-          {/* Team comparison */}
-          <div className="grid grid-cols-2 gap-3 mb-5 text-xs text-gray-400">
-            {[a, b].map((t, idx) => (
-              <div key={idx} className="rounded-lg p-2 text-center" style={{ backgroundColor: "#1a1a1f" }}>
-                <img
-                  src={`https://a.espncdn.com/i/teamlogos/ncaa/500/${t.espnId}.png`}
-                  alt={t.name}
-                  className="w-10 h-10 mx-auto mb-1 object-contain"
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                />
-                <div className="text-white font-bold text-sm">{t.name}</div>
-                <div>{t.record} · {t.conference}</div>
-                <div>Off: {t.offEff} · Def: {t.defEff}</div>
-                <div>Coach: {t.coach}</div>
+            {/* Probability bar */}
+            <div className="mb-4">
+              <div className="flex justify-between text-sm mb-1.5">
+                <span className="font-bold" style={{ color: "#3B82F6" }}>{g.teamA.name} {(g.teamA.winProb * 100).toFixed(0)}%</span>
+                <span className="font-bold" style={{ color: "#F59E0B" }}>{(g.teamB.winProb * 100).toFixed(0)}% {g.teamB.name}</span>
               </div>
-            ))}
-          </div>
+              <div className="h-4 rounded-full overflow-hidden flex" style={{ backgroundColor: "#E5E5E7" }}>
+                <div className="h-full transition-all rounded-l-full" style={{ width: `${g.teamA.winProb * 100}%`, background: "linear-gradient(90deg, #3B82F6, #60A5FA)" }} />
+                <div className="h-full transition-all rounded-r-full" style={{ width: `${g.teamB.winProb * 100}%`, background: "linear-gradient(90deg, #F59E0B, #FBBF24)" }} />
+              </div>
+            </div>
 
-          {/* Pick buttons */}
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { team: a, label: "A", rec: analysis.recommended === "A" },
-              { team: b, label: "B", rec: analysis.recommended === "B" },
-            ].map(({ team, rec }) => (
+            {/* Badges row */}
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <span className="text-xs font-bold px-2.5 py-1 rounded-full border" style={{ backgroundColor: badge.bg, color: badge.text, borderColor: badge.border }}>
+                {upsetLabel(g.upsetRating)}
+              </span>
+              <span className="text-xs font-bold px-2.5 py-1 rounded-full border" style={{ backgroundColor: "#DBEAFE", color: "#1E40AF", borderColor: "#BFDBFE" }}>
+                Confidence: {g.confidence}/10
+              </span>
+            </div>
+
+            {/* Top reasons */}
+            <div className="mb-4">
+              <div className="text-xs font-bold tracking-wider mb-2" style={{ color: "#6B7280" }}>WHY {g.winner.toUpperCase()} WINS</div>
+              <div className="space-y-1.5">
+                {g.topReasons.map((r, i) => (
+                  <div key={i} className="flex items-start gap-2 text-sm" style={{ color: "#374151" }}>
+                    <span style={{ color: "#3B82F6" }}>▸</span>
+                    <span>{r}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Risk factors */}
+            <div className="mb-4">
+              <div className="text-xs font-bold tracking-wider mb-2" style={{ color: "#6B7280" }}>RISK FACTORS</div>
+              <div className="space-y-1.5">
+                {g.riskFactors.map((r, i) => (
+                  <div key={i} className="flex items-start gap-2 text-sm" style={{ color: "#374151" }}>
+                    <span style={{ color: "#F59E0B" }}>⚠</span>
+                    <span>{r}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* AI Analysis */}
+            <div className="mb-4 rounded-xl p-4 border" style={{ backgroundColor: "#F5F5F7", borderColor: "#E5E5E7" }}>
+              <div className="text-xs font-bold tracking-wider mb-2" style={{ color: "#6B7280" }}>AI ANALYSIS</div>
+              <p className="text-sm leading-relaxed" style={{ color: "#374151" }}>{g.aiAnalysis}</p>
+            </div>
+
+            {/* Bracket Advice */}
+            <div className="mb-4 rounded-xl p-4 border" style={{ backgroundColor: "#EFF6FF", borderColor: "#BFDBFE" }}>
+              <div className="text-xs font-bold tracking-wider mb-2" style={{ color: "#1E40AF" }}>💡 BRACKET ADVICE</div>
+              <p className="text-sm leading-relaxed font-medium" style={{ color: "#1E40AF" }}>{g.bracketAdvice}</p>
+            </div>
+
+            {/* Team comparison */}
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              {[g.teamA, g.teamB].map((t, idx) => (
+                <div key={idx} className="rounded-xl p-3 text-center border" style={{ backgroundColor: "#F5F5F7", borderColor: "#E5E5E7" }}>
+                  <img
+                    src={`https://a.espncdn.com/i/teamlogos/ncaa/500/${ESPN_IDS[t.name] || 0}.png`}
+                    alt={t.name} className="w-12 h-12 mx-auto mb-2 object-contain"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                  <div className="font-bold text-sm" style={{ color: "#1A1A1A" }}>{t.name}</div>
+                  <div className="text-xs mt-1" style={{ color: "#6B7280" }}>
+                    {t.record} · Seed {t.seed}
+                  </div>
+                  <div className="text-xs mt-1" style={{ color: "#6B7280" }}>
+                    Off: {t.offEff} · Def: {t.defEff}
+                  </div>
+                  <div className="text-xs mt-1" style={{ color: "#6B7280" }}>
+                    ⭐ {t.keyPlayer}
+                  </div>
+                  <div className="text-xs mt-1" style={{ color: "#6B7280" }}>
+                    Coach: {t.coach}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setSelectedGame(null)}
+              className="w-full py-2.5 rounded-xl font-bold text-sm transition-all"
+              style={{ backgroundColor: "#F5F5F7", color: "#6B7280", border: "1px solid #E5E5E7" }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ─── Layout ───────────────────────────────────────────────────────────
+  return (
+    <div className="min-h-screen" style={{ backgroundColor: "#FFFFFF", color: "#1A1A1A" }}>
+      {/* Banner */}
+      <div className="border-b" style={{ borderColor: "#E5E5E7", background: "linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)" }}>
+        <div className="max-w-6xl mx-auto px-4 py-6 text-center">
+          <div className="text-xs tracking-[0.3em] font-bold mb-2" style={{ color: "#3B82F6" }}>
+            MARCH MADNESS 2026
+          </div>
+          <h1 className="text-2xl md:text-3xl font-black mb-2" style={{ color: "#1A1A1A" }}>
+            2026 NCAA Tournament Predictions
+          </h1>
+          <p className="text-sm max-w-2xl mx-auto" style={{ color: "#6B7280" }}>
+            Model trained on 12 years of tournament data (2013–2025) — All picks as of March 19, 2026 pregame
+          </p>
+          <div className="flex items-center justify-center gap-4 mt-3 text-xs" style={{ color: "#9CA3AF" }}>
+            <span>64 teams · 4 regions · 32 first-round matchups</span>
+            <span style={{ color: "#E5E5E7" }}>|</span>
+            <span>Efficiency metrics · Historical upset rates · Location analysis</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Main nav tabs */}
+      <div className="border-b sticky top-0 z-40" style={{ borderColor: "#E5E5E7", backgroundColor: "#FFFFFF" }}>
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="flex gap-0">
+            {(["bracket", "upsets", "strategy"] as const).map((v) => (
               <button
-                key={team.name}
-                onClick={() => handlePick(pickRegion, round, pos, team)}
-                className="py-3 rounded-lg font-bold text-sm transition-all border"
+                key={v}
+                onClick={() => setView(v)}
+                className="px-5 py-3 text-sm font-bold tracking-wider border-b-2 transition-all"
                 style={{
-                  backgroundColor: rec ? "#1e3a5f" : "#1a1a1f",
-                  borderColor: rec ? "#3B82F6" : "#374151",
-                  color: rec ? "#93C5FD" : "#9CA3AF",
+                  borderColor: view === v ? "#3B82F6" : "transparent",
+                  color: view === v ? "#3B82F6" : "#9CA3AF",
+                  backgroundColor: view === v ? "rgba(59,130,246,0.04)" : "transparent",
                 }}
               >
-                {rec && <span className="text-xs block text-blue-400 mb-0.5">★ AI PICK</span>}
-                Pick ({team.seed}) {team.name}
+                {v === "bracket" ? "🏀 BRACKET" : v === "upsets" ? "🔥 TOP UPSETS" : "📋 STRATEGY"}
               </button>
             ))}
           </div>
         </div>
       </div>
-    );
-  };
-
-  // ─── Team cell ────────────────────────────────────────────────────────
-  const TeamCell = ({
-    team,
-    isWinner,
-    isClickable,
-    onClick,
-  }: {
-    team: Team | null;
-    isWinner: boolean;
-    isClickable: boolean;
-    onClick?: () => void;
-  }) => {
-    if (!team) {
-      return (
-        <div
-          className="h-10 rounded border border-dashed flex items-center justify-center text-xs"
-          style={{ borderColor: "#2a2a30", color: "#4a4a50", minWidth: 150 }}
-        >
-          TBD
-        </div>
-      );
-    }
-    return (
-      <div
-        onClick={isClickable ? onClick : undefined}
-        className={`h-10 rounded flex items-center gap-2 px-2 border text-sm transition-all ${
-          isClickable ? "cursor-pointer hover:border-blue-500" : ""
-        }`}
-        style={{
-          backgroundColor: isWinner ? "#1e3a5f" : "#141418",
-          borderColor: isWinner ? "#3B82F6" : "#2a2a30",
-          minWidth: 150,
-        }}
-      >
-        <img
-          src={`https://a.espncdn.com/i/teamlogos/ncaa/500/${team.espnId}.png`}
-          alt=""
-          className="w-5 h-5 object-contain flex-shrink-0"
-          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-        />
-        <span
-          className="text-xs font-bold flex-shrink-0 w-5 h-5 rounded flex items-center justify-center"
-          style={{ backgroundColor: "#0A0A0C", color: seedColor(team.seed) }}
-        >
-          {team.seed}
-        </span>
-        <span className="text-white font-medium truncate text-xs">{team.name}</span>
-        {isWinner && <span className="ml-auto text-green-400 text-xs">✓</span>}
-      </div>
-    );
-  };
-
-  // ─── Seed color coding ────────────────────────────────────────────────
-  function seedColor(seed: number): string {
-    if (seed <= 4) return "#34D399";
-    if (seed <= 8) return "#60A5FA";
-    if (seed <= 12) return "#FBBF24";
-    return "#F87171";
-  }
-
-  // ─── Region bracket renderer ──────────────────────────────────────────
-  const renderRegionBracket = (region: string) => {
-    const { rounds } = getRegionBracket(region);
-    const regionPicks = picks[region] || {};
-
-    return (
-      <div className="overflow-x-auto pb-4">
-        <div className="flex gap-1 min-w-fit items-start">
-          {rounds.map((roundMatchups, roundIdx) => (
-            <div key={roundIdx} className="flex flex-col" style={{ minWidth: 170 }}>
-              {/* Round header */}
-              <div
-                className="text-center text-xs font-bold tracking-wider mb-3 py-1.5 rounded"
-                style={{ color: "#9CA3AF", backgroundColor: "#141418" }}
-              >
-                {roundLabels[roundIdx]}
-              </div>
-              <div
-                className="flex flex-col justify-around flex-1"
-                style={{ gap: roundIdx === 0 ? 4 : undefined }}
-              >
-                {roundMatchups.map((matchup, mIdx) => {
-                  const pickKey = `${roundIdx}-${mIdx}`;
-                  const hasBothTeams = matchup.teamA && matchup.teamB;
-                  const isPicked = !!regionPicks[pickKey];
-
-                  return (
-                    <div
-                      key={mIdx}
-                      className="flex flex-col gap-0.5 relative"
-                      style={{
-                        marginTop: roundIdx > 0 ? `${Math.pow(2, roundIdx) * 8}px` : 0,
-                        marginBottom: roundIdx > 0 ? `${Math.pow(2, roundIdx) * 8}px` : 0,
-                      }}
-                    >
-                      {/* Connector line */}
-                      {roundIdx > 0 && (
-                        <div
-                          className="absolute -left-1 top-1/2 w-1"
-                          style={{
-                            height: 1,
-                            backgroundColor: "#3B82F6",
-                            transform: "translateY(-50%)",
-                          }}
-                        />
-                      )}
-                      {roundIdx < rounds.length - 1 && (
-                        <div
-                          className="absolute -right-1 top-1/2 w-1"
-                          style={{
-                            height: 1,
-                            backgroundColor: "#2a2a30",
-                          }}
-                        />
-                      )}
-
-                      <div
-                        onClick={() => {
-                          if (hasBothTeams && !isPicked) {
-                            setModalMatchup({ region, round: roundIdx, pos: mIdx });
-                          }
-                        }}
-                        className={`rounded-lg border p-1 ${
-                          hasBothTeams && !isPicked
-                            ? "cursor-pointer hover:border-blue-500 hover:shadow-lg hover:shadow-blue-500/10"
-                            : ""
-                        }`}
-                        style={{
-                          backgroundColor: "#0e0e12",
-                          borderColor: hasBothTeams && !isPicked ? "#3B82F6" : "#1e1e24",
-                        }}
-                      >
-                        <TeamCell
-                          team={matchup.teamA}
-                          isWinner={matchup.winner?.name === matchup.teamA?.name}
-                          isClickable={false}
-                        />
-                        <div className="h-px my-0.5" style={{ backgroundColor: "#1e1e24" }} />
-                        <TeamCell
-                          team={matchup.teamB}
-                          isWinner={matchup.winner?.name === matchup.teamB?.name}
-                          isClickable={false}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  // ─── Final Four renderer ──────────────────────────────────────────────
-  const renderFinalFour = () => {
-    const ff = getFinalFour();
-    const ffPicks = picks["FINAL_FOUR"] || {};
-
-    const renderFFMatchup = (matchup: Matchup, round: number, pos: number, label: string) => {
-      const hasBoth = matchup.teamA && matchup.teamB;
-      const pickKey = `${round}-${pos}`;
-      const isPicked = !!ffPicks[pickKey];
-
-      return (
-        <div className="flex-1 max-w-sm">
-          <div className="text-center text-xs font-bold tracking-wider mb-2" style={{ color: "#9CA3AF" }}>
-            {label}
-          </div>
-          <div
-            onClick={() => {
-              if (hasBoth && !isPicked) {
-                setModalMatchup({ region: "FINAL_FOUR", round, pos });
-              }
-            }}
-            className={`rounded-lg border p-1.5 ${
-              hasBoth && !isPicked ? "cursor-pointer hover:border-blue-500" : ""
-            }`}
-            style={{
-              backgroundColor: "#0e0e12",
-              borderColor: hasBoth && !isPicked ? "#3B82F6" : "#1e1e24",
-            }}
-          >
-            <TeamCell
-              team={matchup.teamA}
-              isWinner={matchup.winner?.name === matchup.teamA?.name}
-              isClickable={false}
-            />
-            <div className="h-px my-1" style={{ backgroundColor: "#1e1e24" }} />
-            <TeamCell
-              team={matchup.teamB}
-              isWinner={matchup.winner?.name === matchup.teamB?.name}
-              isClickable={false}
-            />
-          </div>
-          {matchup.teamA && (
-            <div className="text-center mt-1">
-              <span className="text-xs text-gray-500">
-                {matchup.teamA
-                  ? `${ff.regionOrder[round === 4 ? pos * 2 : 0]} vs ${ff.regionOrder[round === 4 ? pos * 2 + 1 : 2]}`
-                  : ""}
-              </span>
-            </div>
-          )}
-        </div>
-      );
-    };
-
-    return (
-      <div className="flex flex-col items-center gap-8 py-4">
-        {/* Semi finals */}
-        <div className="flex gap-8 w-full max-w-2xl justify-center">
-          {renderFFMatchup(ff.semi1, 4, 0, "SEMIFINAL 1")}
-          {renderFFMatchup(ff.semi2, 4, 1, "SEMIFINAL 2")}
-        </div>
-
-        {/* Championship */}
-        <div className="w-full max-w-sm">
-          {renderFFMatchup(ff.champ, 5, 0, "🏆 NATIONAL CHAMPIONSHIP")}
-        </div>
-
-        {/* Champion display */}
-        {ff.champ.winner && (
-          <div className="text-center mt-4 p-6 rounded-xl border border-yellow-500/30" style={{ backgroundColor: "#1a1810" }}>
-            <div className="text-yellow-400 text-xs tracking-widest font-bold mb-2">🏆 PREDICTED NATIONAL CHAMPION 🏆</div>
-            <img
-              src={`https://a.espncdn.com/i/teamlogos/ncaa/500/${ff.champ.winner.espnId}.png`}
-              alt={ff.champ.winner.name}
-              className="w-20 h-20 mx-auto mb-2 object-contain"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            />
-            <div className="text-3xl font-black text-white">{ff.champ.winner.name}</div>
-            <div className="text-sm text-yellow-400 mt-1">
-              ({ff.champ.winner.seed}) seed · {ff.champ.winner.record} · {ff.champ.winner.conference}
-            </div>
-            <div className="text-xs text-gray-400 mt-1">Coach: {ff.champ.winner.coach}</div>
-          </div>
-        )}
-
-        {/* Region winners */}
-        <div className="w-full max-w-2xl">
-          <div className="text-xs font-bold text-gray-400 tracking-wider mb-3 text-center">REGION CHAMPIONS</div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {ff.regionOrder.map((r, i) => {
-              const winner = ff.eliteWinners[i];
-              return (
-                <div
-                  key={r}
-                  className="rounded-lg border p-3 text-center"
-                  style={{
-                    backgroundColor: winner ? "#141418" : "#0e0e12",
-                    borderColor: winner ? "#3B82F6" : "#1e1e24",
-                  }}
-                >
-                  <div className="text-xs text-gray-500 mb-1">{r}</div>
-                  {winner ? (
-                    <>
-                      <img
-                        src={`https://a.espncdn.com/i/teamlogos/ncaa/500/${winner.espnId}.png`}
-                        alt={winner.name}
-                        className="w-8 h-8 mx-auto mb-1 object-contain"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                      />
-                      <div className="text-sm font-bold text-white">({winner.seed}) {winner.name}</div>
-                    </>
-                  ) : (
-                    <div className="text-sm text-gray-500">TBD</div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // ─── Progress tracker ─────────────────────────────────────────────────
-  const totalPicks = useMemo(() => {
-    let count = 0;
-    Object.values(picks).forEach((rp) => {
-      count += Object.keys(rp).length;
-    });
-    return count;
-  }, [picks]);
-
-  const tabs = [...regionNames, "FINAL FOUR"];
-
-  return (
-    <div className="min-h-screen" style={{ backgroundColor: "#0A0A0C", color: "#E5E7EB" }}>
-      {/* Banner */}
-      <div
-        className="border-b"
-        style={{
-          borderColor: "#1e1e24",
-          background: "linear-gradient(180deg, #0f1020 0%, #0A0A0C 100%)",
-        }}
-      >
-        <div className="max-w-7xl mx-auto px-4 py-5 text-center">
-          <div className="text-xs tracking-[0.3em] text-blue-400 font-bold mb-1">
-            MARCH MADNESS
-          </div>
-          <h1 className="text-2xl md:text-3xl font-black text-white mb-1">
-            2026 NCAA Tournament Predictions
-          </h1>
-          <p className="text-xs text-gray-500">
-            Trained on 2013–2025 historical data · Seed differentials · Efficiency metrics · Upset probability modeling
-          </p>
-          <div className="flex items-center justify-center gap-4 mt-3 text-xs text-gray-400">
-            <span>
-              <span className="text-blue-400 font-bold">{totalPicks}</span> / 63 picks made
-            </span>
-            <span className="text-gray-600">|</span>
-            <span>64 teams · 4 regions · 6 rounds</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="border-b" style={{ borderColor: "#1e1e24" }}>
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex overflow-x-auto gap-0">
-            {tabs.map((tab) => {
-              const isActive = activeTab === (tab === "FINAL FOUR" ? "FINAL_FOUR" : tab);
-              return (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab === "FINAL FOUR" ? "FINAL_FOUR" : tab)}
-                  className="px-4 py-3 text-xs font-bold tracking-wider whitespace-nowrap transition-all border-b-2"
-                  style={{
-                    borderColor: isActive ? "#3B82F6" : "transparent",
-                    color: isActive ? "#3B82F6" : "#6B7280",
-                    backgroundColor: isActive ? "rgba(59,130,246,0.05)" : "transparent",
-                  }}
-                >
-                  {tab === "FINAL FOUR" ? "🏆 FINAL FOUR" : tab}
-                  {tab !== "FINAL FOUR" && (
-                    <span className="ml-1.5 text-gray-600">
-                      {Object.keys(picks[tab] || {}).length}/15
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        {activeTab === "FINAL_FOUR" ? (
-          renderFinalFour()
-        ) : (
+      <div className="max-w-6xl mx-auto px-4 py-6">
+        {/* ── Bracket View ─────────────────────────────────────── */}
+        {view === "bracket" && (
           <>
-            <div className="flex items-center gap-3 mb-4">
-              <h2 className="text-lg font-bold text-white">{activeTab} REGION</h2>
-              <span className="text-xs text-gray-500">
-                {activeTab === "EAST" && "Newark, NJ"}
-                {activeTab === "WEST" && "San Francisco, CA"}
-                {activeTab === "SOUTH" && "Atlanta, GA"}
-                {activeTab === "MIDWEST" && "Indianapolis, IN"}
-              </span>
+            {/* Region tabs */}
+            <div className="flex gap-2 mb-6 flex-wrap">
+              {regionNames.map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setActiveRegion(r)}
+                  className="px-4 py-2 rounded-lg text-sm font-bold transition-all border"
+                  style={{
+                    backgroundColor: activeRegion === r ? "#3B82F6" : "#F5F5F7",
+                    color: activeRegion === r ? "#FFFFFF" : "#6B7280",
+                    borderColor: activeRegion === r ? "#3B82F6" : "#E5E5E7",
+                  }}
+                >
+                  {r}
+                </button>
+              ))}
             </div>
-            <div className="text-xs text-gray-500 mb-4">
-              Click a highlighted matchup to see analysis and make your pick. Winners advance to the next round.
+
+            <div className="mb-4">
+              <h2 className="text-xl font-bold" style={{ color: "#1A1A1A" }}>{activeRegion} Region</h2>
+              <p className="text-sm mt-1" style={{ color: "#9CA3AF" }}>
+                Click any matchup to see detailed analysis, win probabilities, and bracket advice.
+              </p>
             </div>
-            {renderRegionBracket(activeTab)}
+
+            {/* Matchup grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {currentMatchups.map((pred) => (
+                <MatchupCard key={pred.gameId} pred={pred} />
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* ── Top Upsets View ──────────────────────────────────── */}
+        {view === "upsets" && (
+          <>
+            <h2 className="text-xl font-bold mb-2" style={{ color: "#1A1A1A" }}>🔥 Top 5 Most Likely Upsets</h2>
+            <p className="text-sm mb-6" style={{ color: "#9CA3AF" }}>
+              Games most likely to produce an upset based on historical data, team quality, and situational factors.
+            </p>
+
+            <div className="space-y-4 mb-10">
+              {TOP_UPSETS.map((u, i) => (
+                <div
+                  key={i}
+                  className="rounded-xl border p-5 flex items-start gap-4"
+                  style={{ backgroundColor: "#FEF3C7", borderColor: "#FDE68A" }}
+                >
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center font-black text-lg flex-shrink-0"
+                    style={{ backgroundColor: "#F59E0B", color: "#FFFFFF" }}
+                  >
+                    {i + 1}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-1">
+                      <span className="font-bold text-base" style={{ color: "#1A1A1A" }}>{u.matchup}</span>
+                      <span className="text-sm font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#FEE2E2", color: "#991B1B" }}>
+                        {u.prob} upset chance
+                      </span>
+                    </div>
+                    <p className="text-sm" style={{ color: "#374151" }}>{u.reason}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* All upset alerts */}
+            <h3 className="text-lg font-bold mb-4" style={{ color: "#1A1A1A" }}>⚠️ All Upset Alerts</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {PREDICTIONS.filter(p => ["upset-alert", "toss-up"].includes(p.upsetRating)).map((p) => {
+                const badge = upsetBadgeColor(p.upsetRating);
+                const lowerSeed = p.teamA.seed > p.teamB.seed ? p.teamA : p.teamB;
+                return (
+                  <div
+                    key={p.gameId}
+                    onClick={() => { setSelectedGame(p); }}
+                    className="rounded-lg border p-3 cursor-pointer hover:shadow-md transition-all flex items-center gap-3"
+                    style={{ backgroundColor: "#F5F5F7", borderColor: "#E5E5E7" }}
+                  >
+                    <img
+                      src={`https://a.espncdn.com/i/teamlogos/ncaa/500/${ESPN_IDS[lowerSeed.name] || 0}.png`}
+                      alt="" className="w-8 h-8 object-contain"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                    <div className="flex-1">
+                      <div className="text-sm font-semibold" style={{ color: "#1A1A1A" }}>
+                        ({p.teamA.seed}) {p.teamA.name} vs ({p.teamB.seed}) {p.teamB.name}
+                      </div>
+                      <div className="text-xs" style={{ color: "#6B7280" }}>{p.region} · {p.site}</div>
+                    </div>
+                    <span
+                      className="text-xs font-bold px-2 py-0.5 rounded-full border whitespace-nowrap"
+                      style={{ backgroundColor: badge.bg, color: badge.text, borderColor: badge.border }}
+                    >
+                      {upsetLabel(p.upsetRating)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {/* ── Strategy View ────────────────────────────────────── */}
+        {view === "strategy" && (
+          <>
+            <h2 className="text-xl font-bold mb-2" style={{ color: "#1A1A1A" }}>📋 Bracket Strategy Recommendations</h2>
+            <p className="text-sm mb-6" style={{ color: "#9CA3AF" }}>
+              Three approaches based on your pool size and risk tolerance. Expected total upsets in this tournament: ~7.
+            </p>
+
+            {/* Strategy tabs */}
+            <div className="flex gap-2 mb-6">
+              {(["conservative", "balanced", "contrarian"] as const).map((s) => {
+                const strat = STRATEGIES[s];
+                return (
+                  <button
+                    key={s}
+                    onClick={() => setStrategyTab(s)}
+                    className="px-4 py-2.5 rounded-lg text-sm font-bold transition-all border flex-1"
+                    style={{
+                      backgroundColor: strategyTab === s ? (s === "conservative" ? "#DCFCE7" : s === "balanced" ? "#FEF3C7" : "#FEE2E2") : "#F5F5F7",
+                      color: strategyTab === s ? (s === "conservative" ? "#166534" : s === "balanced" ? "#92400E" : "#991B1B") : "#6B7280",
+                      borderColor: strategyTab === s ? (s === "conservative" ? "#BBF7D0" : s === "balanced" ? "#FDE68A" : "#FECACA") : "#E5E5E7",
+                    }}
+                  >
+                    {strat.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Selected strategy */}
+            {(() => {
+              const strat = STRATEGIES[strategyTab];
+              const borderCol = strategyTab === "conservative" ? "#BBF7D0" : strategyTab === "balanced" ? "#FDE68A" : "#FECACA";
+              const bgCol = strategyTab === "conservative" ? "#F0FDF4" : strategyTab === "balanced" ? "#FFFBEB" : "#FEF2F2";
+              return (
+                <div className="rounded-2xl border p-6" style={{ backgroundColor: bgCol, borderColor: borderCol }}>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-bold" style={{ color: "#1A1A1A" }}>{strat.label} — {strat.subtitle}</h3>
+                      <p className="text-sm mt-1" style={{ color: "#6B7280" }}>
+                        {strat.upsets} upsets · Expected correct: {strat.expectedCorrect} / 32
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mb-4">
+                    <div className="text-xs font-bold tracking-wider mb-3" style={{ color: "#6B7280" }}>UPSET PICKS</div>
+                    <div className="space-y-2">
+                      {strat.picks.map((p, i) => (
+                        <div key={i} className="flex items-start gap-2 text-sm" style={{ color: "#374151" }}>
+                          <span className="font-bold" style={{ color: "#F59E0B" }}>⬆️</span>
+                          <span>{p}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl p-4 border" style={{ backgroundColor: "#FFFFFF", borderColor: "#E5E5E7" }}>
+                    <div className="text-xs font-bold tracking-wider mb-1" style={{ color: "#6B7280" }}>STRATEGY NOTE</div>
+                    <p className="text-sm" style={{ color: "#374151" }}>{strat.advice}</p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Location advantages */}
+            <div className="mt-8">
+              <h3 className="text-lg font-bold mb-4" style={{ color: "#1A1A1A" }}>🏠 Teams Playing "At Home"</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {[
+                  { team: "Florida", site: "Tampa", note: "1-seed at HOME — most protected pick in the bracket", seed: 1 },
+                  { team: "Arizona", site: "San Diego", note: "AP #2, West Coast home cooking", seed: 1 },
+                  { team: "Gonzaga", site: "Portland", note: "Zags faithful travel en masse from Spokane", seed: 3 },
+                  { team: "Houston", site: "OKC", note: "6 hours from campus, huge fanbase", seed: 2 },
+                  { team: "North Carolina", site: "Greenville", note: "Tobacco Road South — Carolina fans everywhere", seed: 6 },
+                  { team: "Cal Baptist", site: "San Diego", note: "45 min from campus — 13-seed with home crowd!", seed: 13 },
+                  { team: "Missouri", site: "St. Louis", note: "Mizzou's backyard — 10-seed with home crowd!", seed: 10 },
+                ].map((loc, i) => (
+                  <div key={i} className="rounded-lg border p-3 flex items-center gap-3" style={{ backgroundColor: "#F5F5F7", borderColor: "#E5E5E7" }}>
+                    <img
+                      src={`https://a.espncdn.com/i/teamlogos/ncaa/500/${ESPN_IDS[loc.team] || 0}.png`}
+                      alt="" className="w-8 h-8 object-contain"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                    <div className="flex-1">
+                      <div className="text-sm font-semibold" style={{ color: "#1A1A1A" }}>
+                        ({loc.seed}) {loc.team} in {loc.site}
+                      </div>
+                      <div className="text-xs" style={{ color: "#6B7280" }}>{loc.note}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </>
         )}
       </div>
 
       {/* Footer */}
-      <div className="border-t py-4 text-center text-xs text-gray-600" style={{ borderColor: "#1e1e24" }}>
-        Predictions based on KenPom-style efficiency metrics, historical upset rates by seed, and conference strength adjustments.
-        <br />
-        Not affiliated with the NCAA. For entertainment purposes only.
+      <div className="border-t py-6 text-center" style={{ borderColor: "#E5E5E7" }}>
+        <p className="text-xs" style={{ color: "#9CA3AF" }}>
+          2026 NCAA Tournament Predictions — Model trained on 12 years of tournament data (2013–2025)
+        </p>
+        <p className="text-xs mt-1" style={{ color: "#D1D5DB" }}>
+          Not affiliated with the NCAA. For entertainment and analysis purposes only.
+        </p>
       </div>
 
       {/* Modal */}
