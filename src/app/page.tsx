@@ -69,9 +69,9 @@ const PREDICTIONS: Prediction[] = [
     teamA: { name: "Duke", seed: 1, winProb: 0.99, record: "32-2", coach: "Jon Scheyer", keyPlayer: "Cameron Boozer", offEff: 124.6, defEff: 89.1 },
     teamB: { name: "Siena", seed: 16, winProb: 0.01, record: "23-11", coach: "Carmen Maciariello", keyPlayer: "Jordan Burdick", offEff: 102.3, defEff: 108.1 },
     winner: "Duke", confidence: 10, upsetRating: "near-impossible",
-    topReasons: ["Duke is the #1 overall seed with a 32-2 record and elite metrics across the board", "Cooper Flagg is a generational talent — projected #1 NBA pick", "Siena's MAAC schedule hasn't prepared them for this level of athleticism and depth"],
+    topReasons: ["Duke is the #1 overall seed with a 32-2 record and elite metrics across the board", "Cameron Boozer is a generational talent — projected #1 NBA pick", "Siena's MAAC schedule hasn't prepared them for this level of athleticism and depth"],
     riskFactors: ["Historically, 1-seeds have lost to 16-seeds twice (UMBC 2018, FDU 2023)", "Early tip-off could create flat start for Duke"],
-    aiAnalysis: "This is about as close to a lock as exists in March Madness. Duke is the #1 overall seed, AP #1, and loaded with NBA talent led by Cooper Flagg. Siena won the MAAC tournament to get here but faces a massive talent gap. Duke's offensive and defensive efficiency are both elite. The only question is the margin of victory.",
+    aiAnalysis: "This is about as close to a lock as exists in March Madness. Duke is the #1 overall seed, AP #1, and loaded with NBA talent led by Cameron Boozer. Siena won the MAAC tournament to get here but faces a massive talent gap. Duke's offensive and defensive efficiency are both elite. The only question is the margin of victory.",
     bracketAdvice: "Lock Duke. If you pick Siena, you're lighting your bracket on fire for attention."
   },
   {
@@ -119,9 +119,9 @@ const PREDICTIONS: Prediction[] = [
     teamA: { name: "BYU", seed: 6, winProb: 0.55, record: "23-11", coach: "Kevin Young", keyPlayer: "AJ Dybantsa", offEff: 114.2, defEff: 97.5 },
     teamB: { name: "Texas", seed: 11, winProb: 0.45, record: "18-14", coach: "Sean Miller", keyPlayer: "Dailyn Swain", offEff: 112.0, defEff: 96.8 },
     winner: "BYU", confidence: 5, upsetRating: "upset-alert",
-    topReasons: ["BYU's Big 12 experience and higher seed give them a slight structural edge", "Egor Demin's NBA-level talent can take over a game", "BYU's 3-point shooting is elite — they can shoot you out of the gym"],
-    riskFactors: ["Texas has the SEC pedigree and blue-chip talent to match anyone", "Tre Johnson is a lottery pick who can dominate in single-elimination", "Texas's defensive athleticism is elite despite inconsistent season", "11-seeds have major upset equity — 37% historically"],
-    aiAnalysis: "This is effectively a pick'em dressed up as a 6-11 game. Texas has more raw talent with Tre Johnson, but their inconsistent season (21-13) landed them here as a bubble team or play-in survivor. BYU is steadier with better efficiency numbers but lacks Texas's explosive ceiling. Portland as a neutral site means neither team has a crowd advantage. This could go either way — classic March coin flip in a 6-11 skin.",
+    topReasons: ["BYU's Big 12 experience and higher seed give them a slight structural edge", "AJ Dybantsa's NBA-level talent can take over a game — led the nation in freshman scoring", "BYU's 3-point shooting is elite — they can shoot you out of the gym"],
+    riskFactors: ["Texas has the SEC pedigree and blue-chip talent to match anyone", "Dailyn Swain is a powerful 6-8 guard who can dominate in single-elimination", "Texas's defensive athleticism is elite despite inconsistent season", "11-seeds have major upset equity — 37% historically"],
+    aiAnalysis: "This is effectively a pick'em dressed up as a 6-11 game. Texas has raw talent with Dailyn Swain, but their inconsistent season (21-13) landed them here as a bubble team or play-in survivor. BYU is steadier with better efficiency numbers but lacks Texas's explosive ceiling. Portland as a neutral site means neither team has a crowd advantage. This could go either way — classic March coin flip in a 6-11 skin.",
     bracketAdvice: "UPSET ALERT. Texas's talent gives them a real shot. If you want a trendy 11-seed upset, this is it."
   },
   {
@@ -160,7 +160,7 @@ const PREDICTIONS: Prediction[] = [
     teamB: { name: "Texas A&M", seed: 10, winProb: 0.46, record: "21-11", coach: "Bucky McMillan", keyPlayer: "Mark Mitchell", offEff: 112.5, defEff: 96.8 },
     winner: "Saint Mary's", confidence: 5, upsetRating: "toss-up",
     topReasons: ["Saint Mary's is AP #22 with an elite 27-5 record and offensive efficiency", "Randy Bennett's deliberate pace and system neutralize athletic advantages", "Saint Mary's precision shooting from three is tournament-proven"],
-    riskFactors: ["Texas A&M's SEC schedule is astronomically harder than the WCC", "Buzz Williams' physical, defensive style could disrupt Saint Mary's rhythm", "7-10 games upset 39% of the time — almost a coin flip", "A&M's athleticism and size advantage is significant"],
+    riskFactors: ["Texas A&M's SEC schedule is astronomically harder than the WCC", "Bucky McMillan's physical, defensive style could disrupt Saint Mary's rhythm", "7-10 games upset 39% of the time — almost a coin flip", "A&M's athleticism and size advantage is significant"],
     aiAnalysis: "Classic style clash. Saint Mary's wants to play in the 60s with perfect half-court execution. Texas A&M wants to muck it up with SEC-level physicality and defense. The 7-10 line is basically a coin flip historically, and this game fits that profile. Saint Mary's higher efficiency numbers and better record give them the slight edge, but A&M's strength of schedule is dramatically superior. OKC is neutral territory. This one's going down to the wire.",
     bracketAdvice: "Slight lean to Saint Mary's, but A&M's SEC pedigree makes this dangerous. Genuine 55/45 game."
   },
@@ -179,9 +179,9 @@ const PREDICTIONS: Prediction[] = [
     teamA: { name: "North Carolina", seed: 6, winProb: 0.62, record: "24-8", coach: "Hubert Davis", keyPlayer: "Caleb Wilson", offEff: 115.8, defEff: 96.2 },
     teamB: { name: "VCU", seed: 11, winProb: 0.38, record: "27-7", coach: "Ryan Odom", keyPlayer: "Max Shulga", offEff: 111.0, defEff: 97.0 },
     winner: "North Carolina", confidence: 6, upsetRating: "moderate-risk",
-    topReasons: ["UNC is AP #21 with blue-blood talent and ACC battle-testing", "RJ Davis is one of the most experienced guards in college basketball", "Greenville, SC is basically home court for UNC — Carolina fans will pack the arena"],
+    topReasons: ["UNC is AP #21 with blue-blood talent and ACC battle-testing", "Caleb Wilson is one of the most talented freshmen in college basketball", "Greenville, SC is basically home court for UNC — Carolina fans will pack the arena"],
     riskFactors: ["VCU's trademark pressure defense (Havoc legacy) creates chaos and turnovers", "6-11 upset rate is 37% — very live", "UNC can get sloppy with turnovers against pressing teams", "VCU has March pedigree — 2011 Final Four, always dangerous"],
-    aiAnalysis: "UNC in Greenville is a massive location advantage — this is essentially a home game. That alone bumps their win probability. But VCU's pressing style is exactly the type of opponent that gives UNC trouble — the Tar Heels can get turnover-prone against aggressive defenses. Still, UNC's talent, experience (RJ Davis in his 6th year), and crowd advantage should be enough. VCU will make it ugly, but UNC should survive.",
+    aiAnalysis: "UNC in Greenville is a massive location advantage — this is essentially a home game. That alone bumps their win probability. But VCU's pressing style is exactly the type of opponent that gives UNC trouble — the Tar Heels can get turnover-prone against aggressive defenses. Still, UNC's talent, experience, and crowd advantage should be enough. VCU will make it ugly, but UNC should survive.",
     bracketAdvice: "UNC benefits hugely from the Greenville location. Take the Tar Heels, but expect it to be stressful."
   },
   {
@@ -189,9 +189,9 @@ const PREDICTIONS: Prediction[] = [
     teamA: { name: "Illinois", seed: 3, winProb: 0.85, record: "24-8", coach: "Brad Underwood", keyPlayer: "Keaton Wagler", offEff: 117.8, defEff: 94.5 },
     teamB: { name: "Penn", seed: 14, winProb: 0.15, record: "18-11", coach: "Steve Donahue", keyPlayer: "Nick Spinoso", offEff: 105.5, defEff: 104.5 },
     winner: "Illinois", confidence: 8, upsetRating: "unlikely",
-    topReasons: ["Illinois is AP #13 — a Big Ten powerhouse with elite offensive efficiency", "Kasparas Jakucionis is a projected lottery pick who can take over", "Penn's Ivy League schedule provides virtually no preparation for Big Ten-level physicality"],
+    topReasons: ["Illinois is AP #13 — a Big Ten powerhouse with elite offensive efficiency", "Keaton Wagler is a breakout star who can take over — 17.9 PPG and 41% from three", "Penn's Ivy League schedule provides virtually no preparation for Big Ten-level physicality"],
     riskFactors: ["3-14 upsets happen 15% of the time", "Penn's smart, disciplined play style can slow the game down and create variance", "Illinois has historically been upset-prone in March under Underwood"],
-    aiAnalysis: "Illinois should handle this comfortably. Jakucionis gives them a go-to scorer who can break down any defense, and their Big Ten schedule has prepared them for high-intensity basketball. Penn will try to slow the pace and execute in the half-court, but the talent gap is too significant. Illinois's biggest enemy here is themselves — if they come out flat, Penn could hang around. But the Illini's offensive firepower should create enough separation.",
+    aiAnalysis: "Illinois should handle this comfortably. Wagler gives them a go-to scorer who can break down any defense, and their Big Ten schedule has prepared them for high-intensity basketball. Penn will try to slow the pace and execute in the half-court, but the talent gap is too significant. Illinois's biggest enemy here is themselves — if they come out flat, Penn could hang around. But the Illini's offensive firepower should create enough separation.",
     bracketAdvice: "Take Illinois. Not the 3-14 upset I'd target this year."
   },
   {
@@ -249,7 +249,7 @@ const PREDICTIONS: Prediction[] = [
     teamA: { name: "Alabama", seed: 4, winProb: 0.80, record: "23-9", coach: "Nate Oats", keyPlayer: "Labaron Philon Jr.", offEff: 117.0, defEff: 95.0 },
     teamB: { name: "Hofstra", seed: 13, winProb: 0.20, record: "24-10", coach: "Speedy Claxton", keyPlayer: "Tyler Thomas", offEff: 107.0, defEff: 103.0 },
     winner: "Alabama", confidence: 7, upsetRating: "moderate-risk",
-    topReasons: ["Alabama is AP #18 with the #1 strength of schedule in America", "Nate Oats' up-tempo system and Bama's athleticism overwhelm mid-major opponents", "Mark Sears is a proven tournament performer"],
+    topReasons: ["Alabama is AP #18 with the #1 strength of schedule in America", "Nate Oats' up-tempo system and Bama's athleticism overwhelm mid-major opponents", "Labaron Philon Jr. is a projected lottery pick who can take over any game"],
     riskFactors: ["4-13 upset rate is 21%", "Alabama's 3-point variance can work both ways — they live and die by the three", "Hofstra's 26-8 record shows a quality team with shooting ability", "Bama can occasionally play down to competition"],
     aiAnalysis: "Alabama's offense is electric but volatile. When they shoot well from three, they're a Final Four contender. When they go cold, they can lose to anyone. Hofstra will try to slow the pace and keep this in the 60s, which is Alabama's worst-case scenario. Still, Bama's sheer athleticism and SEC-forged toughness should create enough separation. Oats knows how to prepare for March.",
     bracketAdvice: "Alabama should advance, but their boom-or-bust offense introduces risk. Not the 4-13 upset I'd circle."
@@ -259,9 +259,9 @@ const PREDICTIONS: Prediction[] = [
     teamA: { name: "Virginia", seed: 3, winProb: 0.88, record: "29-5", coach: "Ryan Odom", keyPlayer: "Thijs De Ridder", offEff: 115.5, defEff: 89.8 },
     teamB: { name: "Wright State", seed: 14, winProb: 0.12, record: "23-11", coach: "Clint Sargent", keyPlayer: "Brandon Noel", offEff: 104.8, defEff: 104.0 },
     winner: "Virginia", confidence: 9, upsetRating: "very-unlikely",
-    topReasons: ["Virginia is AP #9 with the best defense in college basketball — 89.8 defensive efficiency", "Tony Bennett's pack-line defense is specifically designed to strangle lower-seed offenses", "29-5 record reflects consistent excellence throughout the ACC season"],
+    topReasons: ["Virginia is AP #9 with the best defense in college basketball — 89.8 defensive efficiency", "Ryan Odom's system relies on elite 3-point shooting and a top defense", "29-5 record reflects consistent excellence throughout the ACC season"],
     riskFactors: ["Virginia famously lost to #16 UMBC in 2018 — they know how this can go wrong", "Virginia's slow pace creates variance — fewer possessions means fewer chances to pull away", "3-14 upset rate is 15%"],
-    aiAnalysis: "Virginia's defensive system is the ultimate March Madness weapon — or liability. It keeps games close by design, which theoretically gives the underdog more chances. But Bennett's teams rarely lose to significantly inferior opponents because they simply don't allow enough scoring. Wright State will struggle to crack 55 points against this defense. Virginia should grind this out with their typical 58-47 type score. The UMBC ghost adds a tiny bit of narrative spice, but this UVA team is built differently.",
+    aiAnalysis: "Virginia's defensive system under Ryan Odom is elite. It keeps games close by design, which theoretically gives the underdog more chances. But Odom's teams rarely lose to significantly inferior opponents because they simply don't allow enough scoring. Wright State will struggle to crack 55 points against this defense. Virginia should grind this out with their typical 58-47 type score. This UVA team under Odom is built differently from the Bennett era.",
     bracketAdvice: "Lock Virginia. Their defensive ceiling makes them one of the safest 3-seeds on the board."
   },
   {
@@ -392,7 +392,7 @@ function getRegionMatchups(region: string): Prediction[] {
 
 // ─── Top Upsets ─────────────────────────────────────────────────────────────
 const TOP_UPSETS = [
-  { matchup: "(11) Texas over (6) BYU", prob: "45%", reason: "Tre Johnson is a lottery pick on an 11-seed — absurd talent for this line" },
+  { matchup: "(11) Texas over (6) BYU", prob: "45%", reason: "AJ Dybantsa and Dailyn Swain make this a talent-loaded 6-11 — absurd matchup" },
   { matchup: "(10) Missouri over (7) Miami Fla", prob: "44%", reason: "Mizzou playing in St. Louis is a home game — massive crowd advantage" },
   { matchup: "(10) Santa Clara over (7) Kentucky", prob: "40%", reason: "Kentucky at 21-12 is one of the weakest 7-seeds; Santa Clara at 25-8 is better" },
   { matchup: "(12) High Point over (5) Wisconsin", prob: "38%", reason: "Tubby Smith + 28-5 record + 5-12 historical magic = danger" },
