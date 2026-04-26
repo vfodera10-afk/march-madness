@@ -712,7 +712,7 @@ const STRATEGY_OVERRIDES: Record<string, { r1Upsets: string[]; overrides: Record
   },
 };
 
-function autoFillBracket(strategy: "conservative" | "balanced" | "contrarian"): BracketPick {
+function autoFillBracket(strategy: "conservative" | "mild" | "balanced" | "aggressive" | "contrarian"): BracketPick {
   const picks: BracketPick = {};
   const regions = ["EAST", "WEST", "SOUTH", "MIDWEST"];
   const cfg = STRATEGY_OVERRIDES[strategy];
