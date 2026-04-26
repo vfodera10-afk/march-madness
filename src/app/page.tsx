@@ -415,6 +415,22 @@ const STRATEGIES = {
     ],
     advice: "Final Four: Duke, Arizona, Houston, Michigan. Title: Duke over Arizona. Research shows 2 one-seeds in the Final Four is the historical sweet spot. We keep 3 here for safety but swap Florida for Houston (2-seed with elite defense). 14 of the last 20 champions have been 1-seeds.",
   },
+  mild: {
+    label: "🟢 Mild",
+    subtitle: "Slight Edge (10-50 people)",
+    upsets: 7,
+    expectedCorrect: "23-26",
+    picks: [
+      "🏀 R1: (9) Saint Louis over (8) Georgia — 28-5 vs 22-10, SLU is the better team by record and metrics",
+      "🏀 R1: (9) Iowa over (8) Clemson — Stirtz (20 PPG) + McCollum coaching magic (NCAA tourney wins at every stop)",
+      "🏀 R1: (10) Missouri over (7) Miami Fla — home-court in St. Louis, Mark Mitchell (17.9 PPG)",
+      "🏀 R1: (10) Santa Clara over (7) Kentucky — UK 21-13 and 4-6 in last 10; SCU 26-8 with Allen Graves",
+      "🏀 R1: (12) High Point over (5) Wisconsin — 30-4 + Hall of Fame coach Tubby Smith + 5-12 line (35%)",
+      "🏆 E8: Houston over Florida (South) — Sampson's defense is championship-caliber; Florida lost its backcourt",
+      "🏆 F4: Duke over UConn in E8 — Boozer (22.7 PPG) is the tournament's best player",
+    ],
+    advice: "Final Four: Duke, Arizona, Houston, Michigan. Title: Duke. This is conservative+ with two extra R1 upsets backed by data. Santa Clara over Kentucky is a sharp pick — UK's 21-13 record is historically bad for a 7-seed. High Point's 30-4 record and Tubby Smith make the 5-12 magic real. Houston replaces Florida in the Final Four based on Sampson's 3 straight F4 appearances.",
+  },
   balanced: {
     label: "🟡 Balanced",
     subtitle: "Best Risk/Reward (30-200 people)",
@@ -433,6 +449,22 @@ const STRATEGIES = {
       "💥 F4: St. John's to Elite 8 — Pitino (2 titles) + 28-6 + Big East best defense = underseeded at 5",
     ],
     advice: "Final Four: Duke, Arizona, Houston, Iowa State. Title: Duke over Houston. Key research: 1-seeds make the Final Four only 40% of the time individually. We drop Florida (lost entire backcourt from title team) and Michigan (late-season injuries to Cason). In 10 of 11 recent tournaments, a 5-seed-or-higher crashed the Final Four — Iowa State (2-seed, top-10 D) is our pick.",
+  },
+  aggressive: {
+    label: "🟠 Aggressive",
+    subtitle: "Stand Out (100-500 people)",
+    upsets: 12,
+    expectedCorrect: "19-24",
+    picks: [
+      "🏀 R1: All balanced R1 picks PLUS:",
+      "🏀 R1: (9) Utah State over (8) Villanova ⬆️ — USU 28-6 with Falslev; Willard's first year at Nova",
+      "🏀 R1: (13) Cal Baptist over (4) Kansas ⬆️ — KU at 23-10 + CBU playing in San Diego (near home!)",
+      "💥 R2: Saint Louis over (1) Michigan ⬆️ — SLU 28-5, Avila is a matchup nightmare; Michigan lost Cason",
+      "💥 E8: Houston over Illinois (South) — Sampson's defense holds Wagler under 40% shooting",
+      "💥 E8: Iowa State over Virginia (Midwest) — Momcilovic (50% from 3) torches Odom's zone",
+      "💥 F4: Iowa State to Championship ⬆️ — top-10 D + Momcilovic/Lipsey/Jefferson trio is F4-caliber",
+    ],
+    advice: "Final Four: Duke, Arizona, Houston, Iowa State. Title: Duke over Iowa State. Key difference from balanced: we add Cal Baptist over Kansas (KU at 23-10 is the weakest 4-seed, CBU has home crowd in San Diego) and push Iowa State all the way to the title game. SLU over Michigan is the bold R2 call — Michigan's depth took a hit with Cason's injury and SLU's 28-5 record is elite. Historical note: a 2-seed makes the Final Four 22.5% of the time — ISU's defense makes them that team.",
   },
   contrarian: {
     label: "🔴 Contrarian",
@@ -632,12 +664,30 @@ const STRATEGY_OVERRIDES: Record<string, { r1Upsets: string[]; overrides: Record
     ff: ["Duke", "Arizona", "Houston", "Michigan"],
     champ: "Duke",
   },
+  mild: {
+    r1Upsets: ["Saint Louis", "Iowa", "Missouri", "Santa Clara", "High Point"],
+    overrides: {
+      "SOUTH-EE-0": "Houston",
+    },
+    ff: ["Duke", "Arizona", "Houston", "Michigan"],
+    champ: "Duke",
+  },
   balanced: {
     r1Upsets: ["Saint Louis", "Iowa", "Missouri", "Santa Clara", "High Point", "McNeese", "Texas"],
     overrides: {
       "SOUTH-EE-0": "Houston",
       // St. John's to E8 in East
       "EAST-SS-1": "St. John's",
+    },
+    ff: ["Duke", "Arizona", "Houston", "Iowa State"],
+    champ: "Duke",
+  },
+  aggressive: {
+    r1Upsets: ["Saint Louis", "Iowa", "Missouri", "Santa Clara", "High Point", "McNeese", "Texas", "Utah State", "Cal Baptist"],
+    overrides: {
+      "MIDWEST-R2-0": "Saint Louis",
+      "SOUTH-EE-0": "Houston",
+      "MIDWEST-EE-0": "Iowa State",
     },
     ff: ["Duke", "Arizona", "Houston", "Iowa State"],
     champ: "Duke",
@@ -894,17 +944,22 @@ function InteractiveBracket({ picks, setPicks }: { picks: BracketPick; setPicks:
       {/* Auto-fill & Export */}
       <div className="flex gap-2 mb-4 flex-wrap">
         <span className="text-xs font-medium self-center" style={{ color: "#9CA3AF" }}>Auto-fill:</span>
-        {(["conservative", "balanced", "contrarian"] as const).map(s => (
-          <button key={s} onClick={() => setPicks(() => autoFillBracket(s))}
-            className="px-3 py-1.5 rounded-lg text-[11px] font-bold border cursor-pointer transition-all hover:shadow"
-            style={{
-              backgroundColor: s === "conservative" ? "#F0FDF4" : s === "balanced" ? "#FFFBEB" : "#FEF2F2",
-              color: s === "conservative" ? "#166534" : s === "balanced" ? "#92400E" : "#991B1B",
-              borderColor: s === "conservative" ? "#BBF7D0" : s === "balanced" ? "#FDE68A" : "#FECACA",
-            }}>
-            {s === "conservative" ? "🟢 Conservative" : s === "balanced" ? "🟡 Balanced" : "🔴 Contrarian"}
-          </button>
-        ))}
+        {(["conservative", "mild", "balanced", "aggressive", "contrarian"] as const).map(s => {
+          const c: Record<string,{bg:string;text:string;border:string;label:string}> = {
+            conservative: {bg:"#F0FDF4",text:"#166534",border:"#BBF7D0",label:"🟢 Safe"},
+            mild: {bg:"#ECFDF5",text:"#065F46",border:"#A7F3D0",label:"🟢 Mild"},
+            balanced: {bg:"#FFFBEB",text:"#92400E",border:"#FDE68A",label:"🟡 Balanced"},
+            aggressive: {bg:"#FFF7ED",text:"#9A3412",border:"#FED7AA",label:"🟠 Aggressive"},
+            contrarian: {bg:"#FEF2F2",text:"#991B1B",border:"#FECACA",label:"🔴 Contrarian"},
+          };
+          return (
+            <button key={s} onClick={() => setPicks(() => autoFillBracket(s))}
+              className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold border cursor-pointer transition-all hover:shadow"
+              style={{ backgroundColor: c[s].bg, color: c[s].text, borderColor: c[s].border }}>
+              {c[s].label}
+            </button>
+          );
+        })}
         {Object.keys(picks).length > 10 && (
           <button onClick={() => { document.body.classList.add('printing-bracket'); window.print(); setTimeout(() => document.body.classList.remove('printing-bracket'), 500); }}
             className="px-3 py-1.5 rounded-lg text-[11px] font-bold border cursor-pointer ml-auto"
@@ -1007,7 +1062,7 @@ function InteractiveBracket({ picks, setPicks }: { picks: BracketPick; setPicks:
 export default function MarchMadnessBracket() {
   const [activeRegion, setActiveRegion] = useState("EAST");
   const [selectedGame, setSelectedGame] = useState<Prediction | null>(null);
-  const [strategyTab, setStrategyTab] = useState<"conservative" | "balanced" | "contrarian">("balanced");
+  const [strategyTab, setStrategyTab] = useState<"conservative" | "mild" | "balanced" | "aggressive" | "contrarian">("balanced");
   const [view, setView] = useState<"about" | "bracket" | "interactive" | "upsets" | "strategy">("about");
   const [bracketPicks, setBracketPicks] = useState<BracketPick>({});
 
@@ -1545,17 +1600,25 @@ export default function MarchMadnessBracket() {
 
             {/* Strategy tabs */}
             <div className="flex gap-2 mb-6">
-              {(["conservative", "balanced", "contrarian"] as const).map((s) => {
+              {(["conservative", "mild", "balanced", "aggressive", "contrarian"] as const).map((s) => {
                 const strat = STRATEGIES[s];
+                const colors: Record<string, {bg:string;text:string;border:string}> = {
+                  conservative: {bg:"#DCFCE7",text:"#166534",border:"#BBF7D0"},
+                  mild: {bg:"#D1FAE5",text:"#065F46",border:"#A7F3D0"},
+                  balanced: {bg:"#FEF3C7",text:"#92400E",border:"#FDE68A"},
+                  aggressive: {bg:"#FFEDD5",text:"#9A3412",border:"#FED7AA"},
+                  contrarian: {bg:"#FEE2E2",text:"#991B1B",border:"#FECACA"},
+                };
+                const c = colors[s];
                 return (
                   <button
                     key={s}
                     onClick={() => setStrategyTab(s)}
-                    className="px-4 py-2.5 rounded-lg text-sm font-bold transition-all border flex-1"
+                    className="px-3 py-2 rounded-lg text-xs font-bold transition-all border flex-1"
                     style={{
-                      backgroundColor: strategyTab === s ? (s === "conservative" ? "#DCFCE7" : s === "balanced" ? "#FEF3C7" : "#FEE2E2") : "#F5F5F7",
-                      color: strategyTab === s ? (s === "conservative" ? "#166534" : s === "balanced" ? "#92400E" : "#991B1B") : "#6B7280",
-                      borderColor: strategyTab === s ? (s === "conservative" ? "#BBF7D0" : s === "balanced" ? "#FDE68A" : "#FECACA") : "#E5E5E7",
+                      backgroundColor: strategyTab === s ? c.bg : "#F5F5F7",
+                      color: strategyTab === s ? c.text : "#6B7280",
+                      borderColor: strategyTab === s ? c.border : "#E5E5E7",
                     }}
                   >
                     {strat.label}
@@ -1567,8 +1630,15 @@ export default function MarchMadnessBracket() {
             {/* Selected strategy */}
             {(() => {
               const strat = STRATEGIES[strategyTab];
-              const borderCol = strategyTab === "conservative" ? "#BBF7D0" : strategyTab === "balanced" ? "#FDE68A" : "#FECACA";
-              const bgCol = strategyTab === "conservative" ? "#F0FDF4" : strategyTab === "balanced" ? "#FFFBEB" : "#FEF2F2";
+              const colorMap: Record<string,{border:string;bg:string}> = {
+                conservative: {border:"#BBF7D0",bg:"#F0FDF4"},
+                mild: {border:"#A7F3D0",bg:"#ECFDF5"},
+                balanced: {border:"#FDE68A",bg:"#FFFBEB"},
+                aggressive: {border:"#FED7AA",bg:"#FFF7ED"},
+                contrarian: {border:"#FECACA",bg:"#FEF2F2"},
+              };
+              const borderCol = colorMap[strategyTab]?.border ?? "#E5E7EB";
+              const bgCol = colorMap[strategyTab]?.bg ?? "#F9FAFB";
               return (
                 <div className="rounded-2xl border p-6" style={{ backgroundColor: bgCol, borderColor: borderCol }}>
                   <div className="flex items-center justify-between mb-4">
