@@ -587,68 +587,97 @@ function PrintableBracket({ picks, getSeedForTeam }: { picks: Record<string, str
 type BracketPick = Record<string, string>;
 
 // Auto-fill bracket from a strategy
+// Strategy-specific overrides for later rounds
+const STRATEGY_OVERRIDES: Record<string, { r1Upsets: string[]; overrides: Record<string, string>; ff: [string,string,string,string]; champ: string }> = {
+  conservative: {
+    r1Upsets: ["Saint Louis", "Iowa", "Missouri"],
+    overrides: {
+      // Houston over Florida in South E8
+      "SOUTH-EE-0": "Houston",
+    },
+    ff: ["Duke", "Arizona", "Houston", "Michigan"],
+    champ: "Duke",
+  },
+  balanced: {
+    r1Upsets: ["Saint Louis", "Iowa", "Missouri", "Santa Clara", "High Point", "McNeese", "Texas"],
+    overrides: {
+      "SOUTH-EE-0": "Houston",
+      // St. John's to E8 in East
+      "EAST-SS-1": "St. John's",
+    },
+    ff: ["Duke", "Arizona", "Houston", "Iowa State"],
+    champ: "Duke",
+  },
+  contrarian: {
+    r1Upsets: ["Saint Louis", "Iowa", "Missouri", "Santa Clara", "High Point", "McNeese", "Texas", "Utah State", "UCF", "Cal Baptist"],
+    overrides: {
+      // Saint Louis over Michigan in R2
+      "MIDWEST-R2-0": "Saint Louis",
+      // Arkansas over Arizona in S16
+      "WEST-SS-0": "Arkansas",
+      // Arkansas wins West
+      "WEST-EE-0": "Arkansas",
+      // Alabama to Midwest EE
+      "MIDWEST-SS-1": "Alabama",
+      "MIDWEST-EE-0": "Alabama",
+      // Houston wins South
+      "SOUTH-EE-0": "Houston",
+    },
+    ff: ["Duke", "Arkansas", "Houston", "Alabama"],
+    champ: "Houston",
+  },
+};
+
 function autoFillBracket(strategy: "conservative" | "balanced" | "contrarian"): BracketPick {
   const picks: BracketPick = {};
   const regions = ["EAST", "WEST", "SOUTH", "MIDWEST"];
+  const cfg = STRATEGY_OVERRIDES[strategy];
+  const upsetSet = new Set(cfg.r1Upsets);
 
-  // Get upset picks for this strategy
-  const strat = STRATEGIES[strategy];
-  const upsetTeams = new Set<string>();
-  for (const pick of strat.picks) {
-    // Extract team name from format like "(9) Saint Louis over (8) Georgia"
-    const match = pick.match(/\(\d+\)\s+([A-Za-z .'']+?)\s+over/i);
-    if (match) upsetTeams.add(match[1].trim());
-  }
+  const getSeed = (name: string) => PREDICTIONS.flatMap(p => [p.teamA, p.teamB]).find(t => t.name === name)?.seed ?? 99;
 
+  // R1: use AI winner unless underdog is in upset list
   for (const region of regions) {
     const matchups = getRegionMatchups(region);
-    // R1
     matchups.forEach((pred, i) => {
-      const slotId = `${region}-R1-${i}`;
-      // Check if the underdog is in the upset set
       const dog = pred.teamA.seed > pred.teamB.seed ? pred.teamA : pred.teamB;
-      const fav = pred.teamA.seed < pred.teamB.seed ? pred.teamA : pred.teamB;
-      if (upsetTeams.has(dog.name)) {
-        picks[slotId] = dog.name;
-      } else {
-        // Default: pick the AI winner (usually the favorite)
-        picks[slotId] = pred.winner;
-      }
+      picks[`${region}-R1-${i}`] = upsetSet.has(dog.name) ? dog.name : pred.winner;
     });
-    // R2: pick the higher-seeded (lower number) winner from R1
-    for (let i = 0; i < 4; i++) {
-      const a = picks[`${region}-R1-${i * 2}`];
-      const b = picks[`${region}-R1-${i * 2 + 1}`];
-      if (a && b) {
-        const sA = PREDICTIONS.flatMap(p => [p.teamA, p.teamB]).find(t => t.name === a)?.seed ?? 99;
-        const sB = PREDICTIONS.flatMap(p => [p.teamA, p.teamB]).find(t => t.name === b)?.seed ?? 99;
-        picks[`${region}-R2-${i}`] = sA <= sB ? a : b;
-      }
-    }
-    // SS
-    for (let i = 0; i < 2; i++) {
-      const a = picks[`${region}-R2-${i * 2}`];
-      const b = picks[`${region}-R2-${i * 2 + 1}`];
-      if (a && b) {
-        const sA = PREDICTIONS.flatMap(p => [p.teamA, p.teamB]).find(t => t.name === a)?.seed ?? 99;
-        const sB = PREDICTIONS.flatMap(p => [p.teamA, p.teamB]).find(t => t.name === b)?.seed ?? 99;
-        picks[`${region}-SS-${i}`] = sA <= sB ? a : b;
-      }
-    }
-    // EE
-    const a = picks[`${region}-SS-0`];
-    const b = picks[`${region}-SS-1`];
-    if (a && b) {
-      const sA = PREDICTIONS.flatMap(p => [p.teamA, p.teamB]).find(t => t.name === a)?.seed ?? 99;
-      const sB = PREDICTIONS.flatMap(p => [p.teamA, p.teamB]).find(t => t.name === b)?.seed ?? 99;
-      picks[`${region}-EE-0`] = sA <= sB ? a : b;
-    }
   }
-  // FF
-  const e = picks["EAST-EE-0"], w = picks["WEST-EE-0"], s = picks["SOUTH-EE-0"], m = picks["MIDWEST-EE-0"];
-  if (e && w) picks["FF-0"] = e; // favor East 1-seed
-  if (s && m) picks["FF-1"] = s; // favor South 1-seed
-  if (picks["FF-0"] && picks["FF-1"]) picks["CHAMP"] = picks["FF-0"];
+
+  // R2, SS, EE: default = lower seed wins, then apply overrides
+  for (const region of regions) {
+    for (let i = 0; i < 4; i++) {
+      const key = `${region}-R2-${i}`;
+      if (!cfg.overrides[key]) {
+        const a = picks[`${region}-R1-${i*2}`], b = picks[`${region}-R1-${i*2+1}`];
+        if (a && b) picks[key] = getSeed(a) <= getSeed(b) ? a : b;
+      } else { picks[key] = cfg.overrides[key]; }
+    }
+    for (let i = 0; i < 2; i++) {
+      const key = `${region}-SS-${i}`;
+      if (!cfg.overrides[key]) {
+        const a = picks[`${region}-R2-${i*2}`], b = picks[`${region}-R2-${i*2+1}`];
+        if (a && b) picks[key] = getSeed(a) <= getSeed(b) ? a : b;
+      } else { picks[key] = cfg.overrides[key]; }
+    }
+    const eeKey = `${region}-EE-0`;
+    if (!cfg.overrides[eeKey]) {
+      const a = picks[`${region}-SS-0`], b = picks[`${region}-SS-1`];
+      if (a && b) picks[eeKey] = getSeed(a) <= getSeed(b) ? a : b;
+    } else { picks[eeKey] = cfg.overrides[eeKey]; }
+  }
+
+  // Final Four & Championship from strategy config
+  picks["FF-0"] = cfg.ff[0]; // East winner vs West winner
+  picks["FF-1"] = cfg.ff[2]; // South winner vs Midwest winner
+  // Make sure regional champs match FF picks
+  picks["EAST-EE-0"] = cfg.ff[0];
+  picks["WEST-EE-0"] = cfg.ff[1];
+  picks["SOUTH-EE-0"] = cfg.ff[2];
+  picks["MIDWEST-EE-0"] = cfg.ff[3];
+  picks["CHAMP"] = cfg.champ;
+
   return picks;
 }
 
