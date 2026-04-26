@@ -580,7 +580,7 @@ function PrintableBracket({ picks, getSeedForTeam }: { picks: Record<string, str
   };
 
   return (
-    <div id="print-bracket" style={{ width: "100%", padding: "8px 16px", fontFamily: "Arial, sans-serif", fontSize: 8 }}>
+    <div id="print-bracket" style={{ width: "100%", padding: "8px 16px", fontFamily: "Arial, sans-serif", fontSize: 8, color: "#000000", background: "#FFFFFF" }}>
       <div style={{ textAlign: "center", marginBottom: 10 }}>
         <div style={{ fontSize: 18, fontWeight: 900 }}>2026 NCAA TOURNAMENT BRACKET</div>
         <div style={{ fontSize: 9, color: "#666" }}>March Madness Predictor • AI-Powered Analysis</div>

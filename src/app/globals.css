@@ -1,11 +1,12 @@
 @import "tailwindcss";
 
 @media print {
-  body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; margin: 0 !important; padding: 0 !important; }
+  body { background: white !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; margin: 0 !important; padding: 0 !important; color: #000000 !important; }
   @page { size: landscape; margin: 0.25in; }
 
-  /* Hide everything except the printable bracket */
-  #print-bracket { display: block !important; }
+  #print-bracket { display: block !important; color: #000000 !important; background: white !important; }
+  #print-bracket * { color: #000000 !important; }
+  #print-bracket [style*="fontWeight: 700"], #print-bracket [style*="font-weight: 700"], #print-bracket b, #print-bracket strong { color: #000000 !important; }
   #main-app { display: none !important; }
 }
 
