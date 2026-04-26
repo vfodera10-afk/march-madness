@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 
 // ─── ESPN Team ID Map ───────────────────────────────────────────────────────
 const ESPN_IDS: Record<string, number> = {
@@ -495,88 +495,122 @@ function upsetLabel(rating: string): string {
 // ─── Component ──────────────────────────────────────────────────────────────
 // ─── Printable Bracket Component ──────────────────────────────────────────
 function PrintableBracket({ picks, getSeedForTeam }: { picks: Record<string, string>; getSeedForTeam: (name: string) => number | null }) {
-  const regions = ["EAST", "WEST", "SOUTH", "MIDWEST"];
   const getW = (id: string) => picks[id] || "";
-
-  const Cell = ({ name, bold }: { name: string; bold?: boolean }) => {
-    const seed = name ? getSeedForTeam(name) : null;
-    return (
-      <div style={{ padding: "2px 4px", fontSize: 8, fontFamily: "Arial, sans-serif", borderBottom: "1px solid #ccc", minWidth: 90, height: 16, lineHeight: "12px", whiteSpace: "nowrap", overflow: "hidden", fontWeight: bold ? 700 : 400, backgroundColor: bold ? "#EFF6FF" : "transparent" }}>
-        {seed ? `(${seed}) ` : ""}{name || "___________"}
-      </div>
-    );
+  const label = (name: string) => {
+    if (!name) return "_____________";
+    const s = getSeedForTeam(name);
+    return s ? `(${s}) ${name}` : name;
   };
 
-  const RegionBracket = ({ region, side }: { region: string; side: "left" | "right" }) => {
+  const RegionTable = ({ region }: { region: string }) => {
     const matchups = getRegionMatchups(region);
     const r1 = matchups.map((p, i) => ({ a: p.teamA.name, b: p.teamB.name, w: getW(`${region}-R1-${i}`) }));
     const r2 = Array.from({ length: 4 }, (_, i) => getW(`${region}-R2-${i}`));
     const ss = Array.from({ length: 2 }, (_, i) => getW(`${region}-SS-${i}`));
     const ee = getW(`${region}-EE-0`);
 
+    const s: React.CSSProperties = { fontSize: 7, padding: "1px 3px", borderBottom: "1px solid #ddd", whiteSpace: "nowrap" as const, fontFamily: "Arial" };
+    const b: React.CSSProperties = { ...s, fontWeight: 700, backgroundColor: "#E8F0FE" };
+
     return (
-      <div style={{ display: "flex", flexDirection: side === "left" ? "row" : "row-reverse", alignItems: "center", gap: 4 }}>
-        {/* R1 */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <table style={{ borderCollapse: "collapse", width: "100%" }}>
+        <thead><tr>
+          <th style={{ ...s, fontWeight: 700, fontSize: 6, color: "#999", textAlign: "left", width: "28%" }}>R64</th>
+          <th style={{ ...s, fontWeight: 700, fontSize: 6, color: "#999", textAlign: "left", width: "22%" }}>R32</th>
+          <th style={{ ...s, fontWeight: 700, fontSize: 6, color: "#999", textAlign: "left", width: "22%" }}>S16</th>
+          <th style={{ ...s, fontWeight: 700, fontSize: 6, color: "#999", textAlign: "left", width: "22%" }}>E8</th>
+          <th style={{ ...s, fontWeight: 700, fontSize: 6, color: "#999", textAlign: "left", width: "6%" }}></th>
+        </tr></thead>
+        <tbody>
+          {r1.map((g, i) => {
+            const isTop = i % 2 === 0;
+            const r2Idx = Math.floor(i / 2);
+            const ssIdx = Math.floor(i / 4);
+            return (
+              <tr key={`${region}-${i}-a`}>
+                <td style={g.w === g.a ? b : s}>{label(g.a)}</td>
+                {isTop && <td rowSpan={4} style={r2[r2Idx] ? b : s}>{label(r2[r2Idx])}</td>}
+                {i === 0 && <td rowSpan={8} style={ss[0] ? b : s}>{label(ss[0])}</td>}
+                {i === 0 && <td rowSpan={16} style={ee ? b : s}>{label(ee)}</td>}
+                {i === 0 && <td rowSpan={16} style={{ ...s, fontSize: 8, fontWeight: 700, color: "#666", writingMode: "vertical-rl" as const }}>{region}</td>}
+              </tr>
+            );
+          })}
           {r1.map((g, i) => (
-            <div key={i}>
-              <Cell name={g.a} bold={g.w === g.a} />
-              <Cell name={g.b} bold={g.w === g.b} />
-              <div style={{ height: 4 }} />
-            </div>
+            <tr key={`${region}-${i}-b`}>
+              <td style={g.w === g.b ? b : s}>{label(g.b)}</td>
+            </tr>
           ))}
-        </div>
-        {/* R2 */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 20, justifyContent: "center" }}>
-          {r2.map((w, i) => <div key={i}><Cell name={w} bold={!!w} /></div>)}
-        </div>
-        {/* SS */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 60, justifyContent: "center" }}>
-          {ss.map((w, i) => <div key={i}><Cell name={w} bold={!!w} /></div>)}
-        </div>
-        {/* EE */}
-        <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
-          <Cell name={ee} bold={!!ee} />
-          <div style={{ fontSize: 7, textAlign: "center", color: "#666", marginTop: 2 }}>{region}</div>
+        </tbody>
+      </table>
+    );
+  };
+
+  // Simpler approach: just list all picks per region in a clear table format
+  const RegionSection = ({ region }: { region: string }) => {
+    const matchups = getRegionMatchups(region);
+    return (
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: 9, fontWeight: 900, borderBottom: "2px solid #333", paddingBottom: 2, marginBottom: 4 }}>{region} REGION</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 2, fontSize: 7, fontFamily: "Arial" }}>
+          <div style={{ fontWeight: 700, color: "#666", fontSize: 6 }}>ROUND OF 64</div>
+          <div style={{ fontWeight: 700, color: "#666", fontSize: 6 }}>ROUND OF 32</div>
+          <div style={{ fontWeight: 700, color: "#666", fontSize: 6 }}>SWEET 16</div>
+          <div style={{ fontWeight: 700, color: "#666", fontSize: 6 }}>ELITE 8</div>
+          {matchups.map((p, i) => {
+            const w = getW(`${region}-R1-${i}`);
+            const r2w = getW(`${region}-R2-${Math.floor(i/2)}`);
+            const ssw = getW(`${region}-SS-${Math.floor(i/4)}`);
+            const eew = getW(`${region}-EE-0`);
+            return (
+              <React.Fragment key={i}>
+                <div style={{ padding: "1px 0" }}>
+                  <div style={{ fontWeight: w === p.teamA.name ? 700 : 400, backgroundColor: w === p.teamA.name ? "#E8F0FE" : "transparent", padding: "0 2px" }}>{label(p.teamA.name)}</div>
+                  <div style={{ fontWeight: w === p.teamB.name ? 700 : 400, backgroundColor: w === p.teamB.name ? "#E8F0FE" : "transparent", padding: "0 2px" }}>{label(p.teamB.name)}</div>
+                </div>
+                {i % 2 === 0 && <div style={{ padding: "1px 2px", gridRow: `span 2`, display: "flex", alignItems: "center", fontWeight: 700, backgroundColor: r2w ? "#E8F0FE" : "transparent" }}>{label(r2w)}</div>}
+                {i % 4 === 0 && <div style={{ padding: "1px 2px", gridRow: `span 4`, display: "flex", alignItems: "center", fontWeight: 700, backgroundColor: ssw ? "#E8F0FE" : "transparent" }}>{label(ssw)}</div>}
+                {i === 0 && <div style={{ padding: "1px 2px", gridRow: `span 8`, display: "flex", alignItems: "center", fontWeight: 700, backgroundColor: eew ? "#E8F0FE" : "transparent" }}>{label(eew)}</div>}
+              </React.Fragment>
+            );
+          })}
         </div>
       </div>
     );
   };
 
   return (
-    <div id="print-bracket" style={{ width: "100%", padding: 12, fontFamily: "Arial, sans-serif" }}>
-      <div style={{ textAlign: "center", marginBottom: 8 }}>
-        <div style={{ fontSize: 16, fontWeight: 900 }}>2026 NCAA TOURNAMENT BRACKET</div>
-        <div style={{ fontSize: 8, color: "#666" }}>March Madness Predictor • AI-Powered Analysis</div>
+    <div id="print-bracket" style={{ width: "100%", padding: "8px 16px", fontFamily: "Arial, sans-serif", fontSize: 8 }}>
+      <div style={{ textAlign: "center", marginBottom: 10 }}>
+        <div style={{ fontSize: 18, fontWeight: 900 }}>2026 NCAA TOURNAMENT BRACKET</div>
+        <div style={{ fontSize: 9, color: "#666" }}>March Madness Predictor • AI-Powered Analysis</div>
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        {/* Left side: East + South */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div><div style={{ fontSize: 9, fontWeight: 700, marginBottom: 4 }}>EAST</div><RegionBracket region="EAST" side="left" /></div>
-          <div><div style={{ fontSize: 9, fontWeight: 700, marginBottom: 4 }}>SOUTH</div><RegionBracket region="SOUTH" side="left" /></div>
-        </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <RegionSection region="EAST" />
+        <RegionSection region="WEST" />
+        <RegionSection region="SOUTH" />
+        <RegionSection region="MIDWEST" />
+      </div>
 
-        {/* Center: Final Four + Championship */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, minWidth: 120 }}>
-          <div style={{ fontSize: 8, fontWeight: 700 }}>FINAL FOUR</div>
-          <Cell name={getW("EAST-EE-0")} bold={getW("FF-0") === getW("EAST-EE-0")} />
-          <Cell name={getW("WEST-EE-0")} bold={getW("FF-0") === getW("WEST-EE-0")} />
-          <div style={{ borderBottom: "2px solid #333", width: 80, margin: "4px 0" }} />
-          <Cell name={getW("FF-0")} bold={getW("CHAMP") === getW("FF-0")} />
-          <div style={{ fontSize: 10, fontWeight: 900, padding: "4px 8px", backgroundColor: getW("CHAMP") ? "#DBEAFE" : "#F3F4F6", borderRadius: 4, textAlign: "center", minWidth: 100 }}>
-            {getW("CHAMP") ? `🏆 ${getW("CHAMP")}` : "CHAMPION"}
+      {/* Final Four */}
+      <div style={{ marginTop: 10, textAlign: "center" }}>
+        <div style={{ fontSize: 10, fontWeight: 900, marginBottom: 6 }}>FINAL FOUR & CHAMPIONSHIP</div>
+        <div style={{ display: "flex", justifyContent: "center", gap: 24, alignItems: "center" }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 7, color: "#666", marginBottom: 2 }}>SEMIFINAL 1 (East vs West)</div>
+            <div style={{ fontSize: 8, fontWeight: 700, padding: "2px 6px", border: "1px solid #ccc", marginBottom: 2 }}>{label(getW("EAST-EE-0"))} vs {label(getW("WEST-EE-0"))}</div>
+            <div style={{ fontSize: 8, fontWeight: 900, backgroundColor: "#E8F0FE", padding: "2px 6px" }}>Winner: {label(getW("FF-0"))}</div>
           </div>
-          <Cell name={getW("FF-1")} bold={getW("CHAMP") === getW("FF-1")} />
-          <div style={{ borderBottom: "2px solid #333", width: 80, margin: "4px 0" }} />
-          <Cell name={getW("SOUTH-EE-0")} bold={getW("FF-1") === getW("SOUTH-EE-0")} />
-          <Cell name={getW("MIDWEST-EE-0")} bold={getW("FF-1") === getW("MIDWEST-EE-0")} />
-        </div>
-
-        {/* Right side: West + Midwest */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{ textAlign: "right" }}><div style={{ fontSize: 9, fontWeight: 700, marginBottom: 4 }}>WEST</div><RegionBracket region="WEST" side="right" /></div>
-          <div style={{ textAlign: "right" }}><div style={{ fontSize: 9, fontWeight: 700, marginBottom: 4 }}>MIDWEST</div><RegionBracket region="MIDWEST" side="right" /></div>
+          <div style={{ textAlign: "center", padding: "8px 16px", backgroundColor: getW("CHAMP") ? "#1E40AF" : "#F3F4F6", borderRadius: 6, color: getW("CHAMP") ? "white" : "#666" }}>
+            <div style={{ fontSize: 7, marginBottom: 2 }}>🏆 CHAMPION</div>
+            <div style={{ fontSize: 12, fontWeight: 900 }}>{getW("CHAMP") || "TBD"}</div>
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 7, color: "#666", marginBottom: 2 }}>SEMIFINAL 2 (South vs Midwest)</div>
+            <div style={{ fontSize: 8, fontWeight: 700, padding: "2px 6px", border: "1px solid #ccc", marginBottom: 2 }}>{label(getW("SOUTH-EE-0"))} vs {label(getW("MIDWEST-EE-0"))}</div>
+            <div style={{ fontSize: 8, fontWeight: 900, backgroundColor: "#E8F0FE", padding: "2px 6px" }}>Winner: {label(getW("FF-1"))}</div>
+          </div>
         </div>
       </div>
     </div>
