@@ -902,9 +902,6 @@ function InteractiveBracket({ picks, setPicks }: { picks: BracketPick; setPicks:
         </div>
       )}
 
-      {/* Printable Bracket - only visible when printing */}
-      <PrintableBracket picks={picks} getSeedForTeam={getSeedForTeam} />
-
       {/* Analysis Modal */}
       {selectedAnalysis && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} onClick={() => setSelectedAnalysis(null)}>
@@ -1192,6 +1189,7 @@ export default function MarchMadnessBracket() {
 
   // ─── Layout ───────────────────────────────────────────────────────────
   return (
+    <>
     <div id="main-app" className="min-h-screen" style={{ backgroundColor: "#FFFFFF", color: "#1A1A1A" }}>
       {/* Banner */}
       <div className="border-b" style={{ borderColor: "#E5E5E7", background: "linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)" }}>
@@ -1585,5 +1583,15 @@ export default function MarchMadnessBracket() {
       {/* Modal */}
       {renderModal()}
     </div>
+
+    {/* Printable Bracket - rendered outside main-app so it shows when printing */}
+    <PrintableBracket picks={bracketPicks} getSeedForTeam={(name: string) => {
+      for (const p of PREDICTIONS) {
+        if (p.teamA.name === name) return p.teamA.seed;
+        if (p.teamB.name === name) return p.teamB.seed;
+      }
+      return null;
+    }} />
+    </>
   );
 }
