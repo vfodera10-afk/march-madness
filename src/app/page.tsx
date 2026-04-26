@@ -855,7 +855,7 @@ export default function MarchMadnessBracket() {
   const [activeRegion, setActiveRegion] = useState("EAST");
   const [selectedGame, setSelectedGame] = useState<Prediction | null>(null);
   const [strategyTab, setStrategyTab] = useState<"conservative" | "balanced" | "contrarian">("balanced");
-  const [view, setView] = useState<"bracket" | "interactive" | "upsets" | "strategy">("bracket");
+  const [view, setView] = useState<"about" | "bracket" | "interactive" | "upsets" | "strategy">("about");
   const [bracketPicks, setBracketPicks] = useState<BracketPick>({});
 
   const regionNames = ["EAST", "WEST", "SOUTH", "MIDWEST"];
@@ -1124,7 +1124,7 @@ export default function MarchMadnessBracket() {
       <div className="border-b sticky top-0 z-40" style={{ borderColor: "#E5E5E7", backgroundColor: "#FFFFFF" }}>
         <div className="max-w-6xl mx-auto px-4">
           <div className="flex gap-0">
-            {(["bracket", "interactive", "upsets", "strategy"] as const).map((v) => (
+            {(["about", "bracket", "interactive", "upsets", "strategy"] as const).map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
@@ -1135,7 +1135,7 @@ export default function MarchMadnessBracket() {
                   backgroundColor: view === v ? "rgba(59,130,246,0.04)" : "transparent",
                 }}
               >
-                {v === "bracket" ? "🏀 ANALYSIS" : v === "interactive" ? "📝 MY BRACKET" : v === "upsets" ? "🔥 TOP UPSETS" : "📋 STRATEGY"}
+                {v === "about" ? "📚 GUIDE" : v === "bracket" ? "🏀 ANALYSIS" : v === "interactive" ? "📝 MY BRACKET" : v === "upsets" ? "🔥 TOP UPSETS" : "📋 STRATEGY"}
               </button>
             ))}
           </div>
@@ -1144,6 +1144,133 @@ export default function MarchMadnessBracket() {
 
       {/* Content */}
       <div className="max-w-6xl mx-auto px-4 py-6">
+
+        {/* ── About / Guide View ──────────────────────────────── */}
+        {view === "about" && (
+          <div className="max-w-3xl mx-auto space-y-8">
+            {/* Welcome */}
+            <div className="rounded-2xl border p-6" style={{ backgroundColor: "#F9FAFB", borderColor: "#E5E7EB" }}>
+              <h2 className="text-2xl font-black mb-3" style={{ color: "#111827" }}>🏀 Welcome to March Madness Predictor</h2>
+              <p className="text-sm leading-relaxed mb-3" style={{ color: "#374151" }}>
+                This tool uses machine learning and historical data to help you build a smarter NCAA Tournament bracket. Whether you're a lifelong college basketball fan or filling out your first bracket ever, we've got you covered.
+              </p>
+              <p className="text-sm leading-relaxed" style={{ color: "#374151" }}>
+                Every prediction, statistic, and analysis on this site uses <strong>only data available before the tournament started</strong> (March 19, 2026). There is zero data leakage — no game results, no tournament outcomes. Just pure pre-tournament analytics.
+              </p>
+            </div>
+
+            {/* March Madness 101 */}
+            <div className="rounded-2xl border p-6" style={{ backgroundColor: "#FFFFFF", borderColor: "#E5E7EB" }}>
+              <h3 className="text-lg font-bold mb-4" style={{ color: "#111827" }}>🎓 March Madness 101 — For First-Timers</h3>
+              <div className="space-y-4 text-sm" style={{ color: "#374151" }}>
+                <div>
+                  <p className="font-bold mb-1" style={{ color: "#111827" }}>What is March Madness?</p>
+                  <p>The NCAA Men's Basketball Tournament is a single-elimination tournament with 68 college teams competing for the national championship. It's called "March Madness" because upsets happen constantly — on any given day, a tiny school can beat a powerhouse.</p>
+                </div>
+                <div>
+                  <p className="font-bold mb-1" style={{ color: "#111827" }}>How does seeding work?</p>
+                  <p>Teams are ranked 1-16 in each of four regions (East, West, South, Midwest). <strong>1-seeds</strong> are the best teams, <strong>16-seeds</strong> are the underdogs. In Round 1, the 1-seed plays the 16-seed, the 2-seed plays the 15-seed, and so on. Lower seeds = better teams.</p>
+                </div>
+                <div>
+                  <p className="font-bold mb-1" style={{ color: "#111827" }}>What's a bracket?</p>
+                  <p>A bracket is your prediction of who wins every game — from Round 1 all the way to the Championship. You pick winners, and they advance to face the next opponent. Getting it right is nearly impossible (1 in 120 billion chance of a perfect bracket), but that's what makes it fun.</p>
+                </div>
+                <div>
+                  <p className="font-bold mb-1" style={{ color: "#111827" }}>What's an "upset"?</p>
+                  <p>When a lower-seeded (worse) team beats a higher-seeded (better) team. A 12-seed beating a 5-seed is a common upset. A 16-seed beating a 1-seed is historic (it's happened only twice ever). Upsets are what make March Madness unpredictable and exciting.</p>
+                </div>
+                <div>
+                  <p className="font-bold mb-1" style={{ color: "#111827" }}>Key numbers to know:</p>
+                  <ul className="list-disc pl-5 space-y-1 mt-1">
+                    <li><strong>5-12 line:</strong> 12-seeds upset 5-seeds 35% of the time — the most famous upset spot</li>
+                    <li><strong>7-10 line:</strong> 10-seeds win 39% — basically a coin flip</li>
+                    <li><strong>1-seeds win it all</strong> 70% of the time (14 of last 20 champions)</li>
+                    <li><strong>~8.5 upsets</strong> happen per tournament on average</li>
+                    <li><strong>At least one 1-seed</strong> gets eliminated before the Final Four in ~60% of tournaments</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* How the model works */}
+            <div className="rounded-2xl border p-6" style={{ backgroundColor: "#FFFFFF", borderColor: "#E5E7EB" }}>
+              <h3 className="text-lg font-bold mb-4" style={{ color: "#111827" }}>🧠 How Our Prediction Model Works</h3>
+              <div className="space-y-4 text-sm" style={{ color: "#374151" }}>
+                <p>Our model combines multiple data sources and historical patterns to generate win probabilities for every matchup:</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[
+                    { icon: "📊", title: "Efficiency Metrics", desc: "Adjusted offensive and defensive efficiency (points per 100 possessions) from KenPom-style models. These measure how good a team actually is, not just their record." },
+                    { icon: "📅", title: "12 Years of Tournament Data", desc: "Our model is trained on every NCAA Tournament from 2013-2025 — over 800 games. It learns which factors predict upsets vs chalk wins." },
+                    { icon: "🎯", title: "Seed Matchup History", desc: "Historical win rates for every seed combination (e.g., 5-seeds beat 12-seeds 65% of the time). These base rates anchor every prediction." },
+                    { icon: "📍", title: "Location Analysis", desc: "Teams playing close to home get a boost. Cal Baptist in San Diego, Missouri in St. Louis, Florida in Tampa — crowd advantage matters." },
+                    { icon: "🏋️", title: "Strength of Schedule", desc: "A 26-6 record in the SEC means more than 26-6 in a mid-major conference. We weight wins by opponent quality." },
+                    { icon: "🧑‍🏫", title: "Coaching Tournament Record", desc: "Coaches like Tom Izzo, Rick Pitino, and Kelvin Sampson consistently overperform in March. Coaching pedigree is a real factor." },
+                  ].map((item, i) => (
+                    <div key={i} className="rounded-xl p-4 border" style={{ backgroundColor: "#F9FAFB", borderColor: "#F3F4F6" }}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-lg">{item.icon}</span>
+                        <span className="font-bold text-sm" style={{ color: "#111827" }}>{item.title}</span>
+                      </div>
+                      <p className="text-xs leading-relaxed" style={{ color: "#6B7280" }}>{item.desc}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="rounded-xl p-4 mt-2" style={{ backgroundColor: "#FEF3C7", border: "1px solid #FDE68A" }}>
+                  <p className="text-xs font-bold mb-1" style={{ color: "#92400E" }}>⚠️ Important Disclaimer</p>
+                  <p className="text-xs" style={{ color: "#92400E" }}>No model can predict March Madness perfectly. Upsets happen because of hot shooting nights, injuries, travel fatigue, and pure randomness. Use these predictions as a starting point, not gospel. The best bracket strategy combines data with your own basketball knowledge and gut instinct.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* How to use this site */}
+            <div className="rounded-2xl border p-6" style={{ backgroundColor: "#FFFFFF", borderColor: "#E5E7EB" }}>
+              <h3 className="text-lg font-bold mb-4" style={{ color: "#111827" }}>🛠️ How to Use This Site</h3>
+              <div className="space-y-3 text-sm" style={{ color: "#374151" }}>
+                {[
+                  { tab: "🏀 Analysis", desc: "Browse every first-round matchup by region. Click any game to see detailed AI analysis, win probabilities, coaching comparisons, key player matchups, and bracket advice." },
+                  { tab: "📝 My Bracket", desc: "Build your own bracket interactively! Click a team to advance them. Use the auto-fill buttons to start from a Conservative, Balanced, or Contrarian strategy, then customize. Print or save as PDF when you're done." },
+                  { tab: "🔥 Top Upsets", desc: "See the 5 most likely upsets ranked by probability. Plus a full list of every game flagged as an Upset Alert or Toss-Up." },
+                  { tab: "📋 Strategy", desc: "Three research-backed bracket strategies for different pool sizes. Each includes specific picks for every round with reasoning, plus location advantages and historical trends." },
+                ].map((item, i) => (
+                  <div key={i} className="flex items-start gap-3 rounded-lg p-3" style={{ backgroundColor: "#F9FAFB" }}>
+                    <span className="text-sm font-bold whitespace-nowrap" style={{ color: "#3B82F6" }}>{item.tab}</span>
+                    <p className="text-xs" style={{ color: "#6B7280" }}>{item.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Tournament structure */}
+            <div className="rounded-2xl border p-6" style={{ backgroundColor: "#FFFFFF", borderColor: "#E5E7EB" }}>
+              <h3 className="text-lg font-bold mb-4" style={{ color: "#111827" }}>📈 Tournament Structure</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {[
+                  { round: "Round of 64", games: 32, desc: "All 64 teams play. 1 vs 16, 2 vs 15, etc." },
+                  { round: "Round of 32", games: 16, desc: "Winners advance. Avg 3-5 upsets here." },
+                  { round: "Sweet 16", games: 8, desc: "Top 16 teams remain. ~3 upsets on avg." },
+                  { round: "Elite 8", games: 4, desc: "Regional finals. Winners go to Final Four." },
+                  { round: "Final Four", games: 2, desc: "Last 4 teams. Held in one city." },
+                  { round: "Championship", games: 1, desc: "The title game. One shining moment." },
+                ].map((item, i) => (
+                  <div key={i} className="rounded-xl p-3 text-center border" style={{ backgroundColor: "#F9FAFB", borderColor: "#F3F4F6" }}>
+                    <p className="text-sm font-bold" style={{ color: "#111827" }}>{item.round}</p>
+                    <p className="text-2xl font-black my-1" style={{ color: "#3B82F6" }}>{item.games}</p>
+                    <p className="text-[10px]" style={{ color: "#9CA3AF" }}>{item.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Data integrity */}
+            <div className="rounded-2xl border p-6" style={{ backgroundColor: "#F0FDF4", borderColor: "#BBF7D0" }}>
+              <h3 className="text-lg font-bold mb-2" style={{ color: "#166534" }}>✅ Data Integrity — No Leakage Guarantee</h3>
+              <p className="text-sm leading-relaxed" style={{ color: "#166534" }}>
+                Every piece of data on this site — records, rosters, coaching staffs, efficiency metrics, and predictions — uses <strong>only information available before brackets were submitted on March 19, 2026</strong>. Our model was trained on historical tournament data from 2013-2025 and applied to 2026 pre-tournament stats. No tournament game results were used in any prediction. This ensures a clean, unbiased analysis free from data leakage.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* ── Bracket View ─────────────────────────────────────── */}
         {view === "bracket" && (
           <>
