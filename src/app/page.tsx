@@ -544,7 +544,7 @@ function PrintableBracket({ picks, getSeedForTeam }: { picks: Record<string, str
   };
 
   return (
-    <div className="print-only" style={{ width: "100%", padding: 12, fontFamily: "Arial, sans-serif" }}>
+    <div id="print-bracket" style={{ width: "100%", padding: 12, fontFamily: "Arial, sans-serif" }}>
       <div style={{ textAlign: "center", marginBottom: 8 }}>
         <div style={{ fontSize: 16, fontWeight: 900 }}>2026 NCAA TOURNAMENT BRACKET</div>
         <div style={{ fontSize: 8, color: "#666" }}>March Madness Predictor • AI-Powered Analysis</div>
@@ -1192,7 +1192,7 @@ export default function MarchMadnessBracket() {
 
   // ─── Layout ───────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#FFFFFF", color: "#1A1A1A" }}>
+    <div id="main-app" className="min-h-screen" style={{ backgroundColor: "#FFFFFF", color: "#1A1A1A" }}>
       {/* Banner */}
       <div className="border-b" style={{ borderColor: "#E5E5E7", background: "linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)" }}>
         <div className="max-w-6xl mx-auto px-4 py-6 text-center">

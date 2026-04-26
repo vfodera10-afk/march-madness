@@ -1,13 +1,15 @@
 @import "tailwindcss";
 
 @media print {
-  body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; margin: 0; padding: 0; }
-  .no-print, .min-h-screen > *:not(.print-only) { display: none !important; }
-  .print-only { display: block !important; position: fixed; top: 0; left: 0; width: 100vw; z-index: 9999; background: white; }
-  @page { size: landscape; margin: 0.15in; }
+  body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; margin: 0 !important; padding: 0 !important; }
+  @page { size: landscape; margin: 0.25in; }
+
+  /* Hide everything except the printable bracket */
+  #print-bracket { display: block !important; }
+  #main-app { display: none !important; }
 }
 
-.print-only { display: none; }
+#print-bracket { display: none; }
 
 :root {
   --bg: #0A0A0C;
