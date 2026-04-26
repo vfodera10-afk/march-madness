@@ -493,6 +493,96 @@ function upsetLabel(rating: string): string {
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────
+// ─── Printable Bracket Component ──────────────────────────────────────────
+function PrintableBracket({ picks, getSeedForTeam }: { picks: Record<string, string>; getSeedForTeam: (name: string) => number | null }) {
+  const regions = ["EAST", "WEST", "SOUTH", "MIDWEST"];
+  const getW = (id: string) => picks[id] || "";
+
+  const Cell = ({ name, bold }: { name: string; bold?: boolean }) => {
+    const seed = name ? getSeedForTeam(name) : null;
+    return (
+      <div style={{ padding: "2px 4px", fontSize: 8, fontFamily: "Arial, sans-serif", borderBottom: "1px solid #ccc", minWidth: 90, height: 16, lineHeight: "12px", whiteSpace: "nowrap", overflow: "hidden", fontWeight: bold ? 700 : 400, backgroundColor: bold ? "#EFF6FF" : "transparent" }}>
+        {seed ? `(${seed}) ` : ""}{name || "___________"}
+      </div>
+    );
+  };
+
+  const RegionBracket = ({ region, side }: { region: string; side: "left" | "right" }) => {
+    const matchups = getRegionMatchups(region);
+    const r1 = matchups.map((p, i) => ({ a: p.teamA.name, b: p.teamB.name, w: getW(`${region}-R1-${i}`) }));
+    const r2 = Array.from({ length: 4 }, (_, i) => getW(`${region}-R2-${i}`));
+    const ss = Array.from({ length: 2 }, (_, i) => getW(`${region}-SS-${i}`));
+    const ee = getW(`${region}-EE-0`);
+
+    return (
+      <div style={{ display: "flex", flexDirection: side === "left" ? "row" : "row-reverse", alignItems: "center", gap: 4 }}>
+        {/* R1 */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {r1.map((g, i) => (
+            <div key={i}>
+              <Cell name={g.a} bold={g.w === g.a} />
+              <Cell name={g.b} bold={g.w === g.b} />
+              <div style={{ height: 4 }} />
+            </div>
+          ))}
+        </div>
+        {/* R2 */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 20, justifyContent: "center" }}>
+          {r2.map((w, i) => <div key={i}><Cell name={w} bold={!!w} /></div>)}
+        </div>
+        {/* SS */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 60, justifyContent: "center" }}>
+          {ss.map((w, i) => <div key={i}><Cell name={w} bold={!!w} /></div>)}
+        </div>
+        {/* EE */}
+        <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+          <Cell name={ee} bold={!!ee} />
+          <div style={{ fontSize: 7, textAlign: "center", color: "#666", marginTop: 2 }}>{region}</div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="print-only" style={{ width: "100%", padding: 12, fontFamily: "Arial, sans-serif" }}>
+      <div style={{ textAlign: "center", marginBottom: 8 }}>
+        <div style={{ fontSize: 16, fontWeight: 900 }}>2026 NCAA TOURNAMENT BRACKET</div>
+        <div style={{ fontSize: 8, color: "#666" }}>March Madness Predictor • AI-Powered Analysis</div>
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        {/* Left side: East + South */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div><div style={{ fontSize: 9, fontWeight: 700, marginBottom: 4 }}>EAST</div><RegionBracket region="EAST" side="left" /></div>
+          <div><div style={{ fontSize: 9, fontWeight: 700, marginBottom: 4 }}>SOUTH</div><RegionBracket region="SOUTH" side="left" /></div>
+        </div>
+
+        {/* Center: Final Four + Championship */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, minWidth: 120 }}>
+          <div style={{ fontSize: 8, fontWeight: 700 }}>FINAL FOUR</div>
+          <Cell name={getW("EAST-EE-0")} bold={getW("FF-0") === getW("EAST-EE-0")} />
+          <Cell name={getW("WEST-EE-0")} bold={getW("FF-0") === getW("WEST-EE-0")} />
+          <div style={{ borderBottom: "2px solid #333", width: 80, margin: "4px 0" }} />
+          <Cell name={getW("FF-0")} bold={getW("CHAMP") === getW("FF-0")} />
+          <div style={{ fontSize: 10, fontWeight: 900, padding: "4px 8px", backgroundColor: getW("CHAMP") ? "#DBEAFE" : "#F3F4F6", borderRadius: 4, textAlign: "center", minWidth: 100 }}>
+            {getW("CHAMP") ? `🏆 ${getW("CHAMP")}` : "CHAMPION"}
+          </div>
+          <Cell name={getW("FF-1")} bold={getW("CHAMP") === getW("FF-1")} />
+          <div style={{ borderBottom: "2px solid #333", width: 80, margin: "4px 0" }} />
+          <Cell name={getW("SOUTH-EE-0")} bold={getW("FF-1") === getW("SOUTH-EE-0")} />
+          <Cell name={getW("MIDWEST-EE-0")} bold={getW("FF-1") === getW("MIDWEST-EE-0")} />
+        </div>
+
+        {/* Right side: West + Midwest */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ textAlign: "right" }}><div style={{ fontSize: 9, fontWeight: 700, marginBottom: 4 }}>WEST</div><RegionBracket region="WEST" side="right" /></div>
+          <div style={{ textAlign: "right" }}><div style={{ fontSize: 9, fontWeight: 700, marginBottom: 4 }}>MIDWEST</div><RegionBracket region="MIDWEST" side="right" /></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Interactive Bracket ────────────────────────────────────────────────────
 type BracketPick = Record<string, string>;
 
@@ -753,10 +843,10 @@ function InteractiveBracket({ picks, setPicks }: { picks: BracketPick; setPicks:
           </button>
         ))}
         {Object.keys(picks).length > 10 && (
-          <button onClick={() => window.print()}
+          <button onClick={() => { document.body.classList.add('printing-bracket'); window.print(); setTimeout(() => document.body.classList.remove('printing-bracket'), 500); }}
             className="px-3 py-1.5 rounded-lg text-[11px] font-bold border cursor-pointer ml-auto"
             style={{ backgroundColor: "#EFF6FF", color: "#1E40AF", borderColor: "#BFDBFE" }}>
-            🖨️ Print / PDF
+            🖨️ Print Bracket
           </button>
         )}
       </div>
@@ -811,6 +901,9 @@ function InteractiveBracket({ picks, setPicks }: { picks: BracketPick; setPicks:
           </div>
         </div>
       )}
+
+      {/* Printable Bracket - only visible when printing */}
+      <PrintableBracket picks={picks} getSeedForTeam={getSeedForTeam} />
 
       {/* Analysis Modal */}
       {selectedAnalysis && (

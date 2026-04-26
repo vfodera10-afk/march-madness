@@ -1,11 +1,13 @@
 @import "tailwindcss";
 
 @media print {
-  body { background: white !important; }
-  .no-print { display: none !important; }
-  button { display: none !important; }
-  .print-show { display: block !important; }
+  body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; margin: 0; padding: 0; }
+  .no-print, .min-h-screen > *:not(.print-only) { display: none !important; }
+  .print-only { display: block !important; position: fixed; top: 0; left: 0; width: 100vw; z-index: 9999; background: white; }
+  @page { size: landscape; margin: 0.15in; }
 }
+
+.print-only { display: none; }
 
 :root {
   --bg: #0A0A0C;
