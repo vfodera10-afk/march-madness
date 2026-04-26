@@ -177,7 +177,7 @@ const PREDICTIONS: Prediction[] = [
   {
     gameId: 13, region: "SOUTH", site: "Greenville, SC", day: "Thursday",
     teamA: { name: "North Carolina", seed: 6, winProb: 0.62, record: "24-8", coach: "Hubert Davis", keyPlayer: "Caleb Wilson", offEff: 115.8, defEff: 96.2 },
-    teamB: { name: "VCU", seed: 11, winProb: 0.38, record: "27-7", coach: "Ryan Odom", keyPlayer: "Max Shulga", offEff: 111.0, defEff: 97.0 },
+    teamB: { name: "VCU", seed: 11, winProb: 0.38, record: "27-7", coach: "Phil Martelli Jr.", keyPlayer: "Max Shulga", offEff: 111.0, defEff: 97.0 },
     winner: "North Carolina", confidence: 6, upsetRating: "moderate-risk",
     topReasons: ["UNC is AP #21 with blue-blood talent and ACC battle-testing", "Caleb Wilson is one of the most talented freshmen in college basketball", "Greenville, SC is basically home court for UNC — Carolina fans will pack the arena"],
     riskFactors: ["VCU's trademark pressure defense (Havoc legacy) creates chaos and turnovers", "6-11 upset rate is 37% — very live", "UNC can get sloppy with turnovers against pressing teams", "VCU has March pedigree — 2011 Final Four, always dangerous"],
@@ -497,6 +497,7 @@ type BracketPick = Record<string, string>;
 function InteractiveBracket() {
   const [activeRegion, setActiveRegion] = useState("EAST");
   const [picks, setPicks] = useState<BracketPick>({});
+  const [selectedAnalysis, setSelectedAnalysis] = useState<Prediction | null>(null);
 
   const regionNames = ["EAST", "WEST", "SOUTH", "MIDWEST"];
   const regionMatchups = useMemo(() => getRegionMatchups(activeRegion), [activeRegion]);
@@ -545,21 +546,50 @@ function InteractiveBracket() {
     return null;
   };
 
+  // Find prediction for a matchup
+  const findPrediction = (tA: string | null, tB: string | null): Prediction | null => {
+    if (!tA || !tB) return null;
+    return PREDICTIONS.find(p =>
+      (p.teamA.name === tA && p.teamB.name === tB) ||
+      (p.teamA.name === tB && p.teamB.name === tA)
+    ) || null;
+  };
+
   const MatchupSlot = ({ slotId, teamA, teamB, round }: { slotId: string; teamA: string | null; teamB: string | null; round: string }) => {
     const winner = getWinner(slotId);
+    const pred = findPrediction(teamA, teamB);
+    const badge = pred ? upsetBadgeColor(pred.upsetRating) : null;
+
     return (
-      <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: "#F9FAFB", borderColor: "#E5E7EB", minWidth: 180 }}>
-        <div className="text-[9px] font-bold tracking-wider text-center py-0.5" style={{ backgroundColor: "#F3F4F6", color: "#9CA3AF" }}>{round}</div>
+      <div className="rounded-xl border overflow-hidden shadow-sm" style={{ backgroundColor: "#FFFFFF", borderColor: "#E5E7EB" }}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-3 py-1.5" style={{ backgroundColor: "#F9FAFB", borderBottom: "1px solid #F3F4F6" }}>
+          <span className="text-[9px] font-bold tracking-wider" style={{ color: "#9CA3AF" }}>{round}</span>
+          {pred && badge && (
+            <button onClick={() => setSelectedAnalysis(pred)} className="text-[8px] font-bold px-1.5 py-0.5 rounded-full border-none cursor-pointer"
+              style={{ backgroundColor: badge.bg, color: badge.text }}>
+              {upsetLabel(pred.upsetRating)} • Details
+            </button>
+          )}
+        </div>
+        {/* Teams */}
         {[teamA, teamB].map((name, idx) => {
           const sd = name ? getSeedForTeam(name) : null;
+          const isWinner = winner === name;
           return (
             <button key={idx} disabled={!name} onClick={() => name && handlePick(slotId, name)}
-              className="w-full flex items-center gap-2 px-3 py-2 border-none cursor-pointer text-left transition-all"
-              style={{ backgroundColor: winner === name ? "#DBEAFE" : "transparent", borderTop: idx === 1 ? "1px solid #E5E7EB" : "none", opacity: name ? 1 : 0.3 }}>
-              {name && <img src={`https://a.espncdn.com/i/teamlogos/ncaa/500/${ESPN_IDS[name] || 0}.png`} alt="" className="w-5 h-5 object-contain flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
-              {sd && <span className="text-[10px] font-bold w-4 text-center" style={{ color: seedColor(sd) }}>{sd}</span>}
-              <span className="text-[12px] font-semibold flex-1" style={{ color: name ? "#1F2937" : "#D1D5DB" }}>{name || "TBD"}</span>
-              {winner === name && <span className="text-[10px]" style={{ color: "#3B82F6" }}>✓</span>}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 border-none cursor-pointer text-left transition-all"
+              style={{
+                backgroundColor: isWinner ? "#EFF6FF" : "transparent",
+                borderTop: idx === 1 ? "1px solid #F3F4F6" : "none",
+                opacity: name ? 1 : 0.3,
+              }}>
+              {name ? (
+                <img src={`https://a.espncdn.com/i/teamlogos/ncaa/500/${ESPN_IDS[name] || 0}.png`} alt="" className="w-6 h-6 object-contain flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+              ) : <div className="w-6 h-6 rounded-full" style={{ backgroundColor: "#F3F4F6" }} />}
+              {sd && <span className="text-[11px] font-bold w-5 h-5 rounded flex items-center justify-center" style={{ backgroundColor: seedBg(sd), color: seedColor(sd) }}>{sd}</span>}
+              <span className="text-[13px] font-semibold flex-1" style={{ color: name ? "#111827" : "#D1D5DB" }}>{name || "TBD"}</span>
+              {isWinner && <span className="text-xs font-bold" style={{ color: "#2563EB" }}>✔</span>}
             </button>
           );
         })}
@@ -574,7 +604,7 @@ function InteractiveBracket() {
           <h2 className="text-xl font-bold" style={{ color: "#1A1A1A" }}>My Bracket</h2>
           <p className="text-sm mt-1" style={{ color: "#9CA3AF" }}>Click a team to advance them. {Object.keys(picks).length} picks made.</p>
         </div>
-        <button onClick={() => setPicks({})} className="px-3 py-1.5 rounded-lg text-xs font-bold border cursor-pointer" style={{ backgroundColor: "#FEF2F2", color: "#DC2626", borderColor: "#FECACA" }}>Reset</button>
+        <button onClick={() => { setPicks({}); setSelectedAnalysis(null); }} className="px-3 py-1.5 rounded-lg text-xs font-bold border cursor-pointer" style={{ backgroundColor: "#FEF2F2", color: "#DC2626", borderColor: "#FECACA" }}>Reset</button>
       </div>
       <div className="flex gap-2 mb-4 flex-wrap">
         {[...regionNames, "FINAL FOUR"].map((r) => (
@@ -624,6 +654,42 @@ function InteractiveBracket() {
               <p className="text-2xl font-black text-white">{getWinner("CHAMP")} 🏆</p>
               <p className="text-sm text-blue-200 mt-1">2026 National Champions</p>
             </div>}
+          </div>
+        </div>
+      )}
+
+      {/* Analysis Modal */}
+      {selectedAnalysis && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} onClick={() => setSelectedAnalysis(null)}>
+          <div className="w-full max-w-lg rounded-2xl border shadow-2xl max-h-[85vh] overflow-y-auto" style={{ backgroundColor: "#FFFFFF", borderColor: "#E5E7EB" }} onClick={(e) => e.stopPropagation()}>
+            <div className="p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base font-bold" style={{ color: "#111827" }}>({selectedAnalysis.teamA.seed}) {selectedAnalysis.teamA.name} vs ({selectedAnalysis.teamB.seed}) {selectedAnalysis.teamB.name}</h3>
+                <button onClick={() => setSelectedAnalysis(null)} className="text-lg border-none bg-transparent cursor-pointer" style={{ color: "#9CA3AF" }}>✕</button>
+              </div>
+              <div className="flex items-center gap-2 mb-3 text-xs" style={{ color: "#6B7280" }}><span>{selectedAnalysis.region}</span><span>•</span><span>{selectedAnalysis.site}</span><span>•</span><span>{selectedAnalysis.day}</span></div>
+              <div className="h-3 rounded-full overflow-hidden flex mb-3" style={{ backgroundColor: "#E5E7EB" }}>
+                <div className="h-full rounded-l-full" style={{ width: `${selectedAnalysis.teamA.winProb * 100}%`, backgroundColor: "#3B82F6" }} />
+                <div className="h-full rounded-r-full" style={{ width: `${selectedAnalysis.teamB.winProb * 100}%`, backgroundColor: "#F59E0B" }} />
+              </div>
+              <div className="flex justify-between text-xs font-bold mb-4"><span style={{ color: "#3B82F6" }}>{selectedAnalysis.teamA.name} {(selectedAnalysis.teamA.winProb*100).toFixed(0)}%</span><span style={{ color: "#F59E0B" }}>{(selectedAnalysis.teamB.winProb*100).toFixed(0)}% {selectedAnalysis.teamB.name}</span></div>
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                {[selectedAnalysis.teamA, selectedAnalysis.teamB].map((t, i) => (
+                  <div key={i} className="rounded-lg p-3 text-center" style={{ backgroundColor: "#F9FAFB" }}>
+                    <img src={`https://a.espncdn.com/i/teamlogos/ncaa/500/${ESPN_IDS[t.name] || 0}.png`} alt="" className="w-10 h-10 mx-auto mb-1 object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    <div className="text-sm font-bold" style={{ color: "#111827" }}>{t.name}</div>
+                    <div className="text-[10px]" style={{ color: "#6B7280" }}>{t.record} • Seed {t.seed}</div>
+                    <div className="text-[10px]" style={{ color: "#6B7280" }}>⭐ {t.keyPlayer}</div>
+                    <div className="text-[10px]" style={{ color: "#6B7280" }}>Coach: {t.coach}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="mb-3"><div className="text-[10px] font-bold tracking-wider mb-1.5" style={{ color: "#6B7280" }}>AI ANALYSIS</div><p className="text-xs leading-relaxed" style={{ color: "#374151" }}>{selectedAnalysis.aiAnalysis}</p></div>
+              <div className="mb-3"><div className="text-[10px] font-bold tracking-wider mb-1.5" style={{ color: "#6B7280" }}>WHY {selectedAnalysis.winner.toUpperCase()} WINS</div>{selectedAnalysis.topReasons.map((r,i) => <div key={i} className="flex items-start gap-1.5 text-xs mb-1" style={{ color: "#374151" }}><span style={{ color: "#3B82F6" }}>▸</span><span>{r}</span></div>)}</div>
+              <div className="mb-3"><div className="text-[10px] font-bold tracking-wider mb-1.5" style={{ color: "#6B7280" }}>RISK FACTORS</div>{selectedAnalysis.riskFactors.map((r,i) => <div key={i} className="flex items-start gap-1.5 text-xs mb-1" style={{ color: "#374151" }}><span style={{ color: "#F59E0B" }}>⚠</span><span>{r}</span></div>)}</div>
+              <div className="rounded-lg p-3 mb-3" style={{ backgroundColor: "#EFF6FF", border: "1px solid #BFDBFE" }}><div className="text-[10px] font-bold tracking-wider mb-1" style={{ color: "#1E40AF" }}>💡 BRACKET ADVICE</div><p className="text-xs font-medium" style={{ color: "#1E40AF" }}>{selectedAnalysis.bracketAdvice}</p></div>
+              <button onClick={() => setSelectedAnalysis(null)} className="w-full py-2 rounded-lg font-bold text-sm border cursor-pointer" style={{ backgroundColor: "#F9FAFB", color: "#6B7280", borderColor: "#E5E7EB" }}>Close</button>
+            </div>
           </div>
         </div>
       )}
