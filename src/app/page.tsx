@@ -701,8 +701,11 @@ const STRATEGY_OVERRIDES: Record<string, { r1Upsets: string[]; overrides: Record
       "WEST-SS-0": "Arkansas",
       // Arkansas wins West
       "WEST-EE-0": "Arkansas",
-      // Alabama to Midwest EE
+      // Iowa State through Midwest top half
+      "MIDWEST-SS-0": "Iowa State",
+      // Alabama through Midwest bottom half  
       "MIDWEST-SS-1": "Alabama",
+      // Alabama wins Midwest
       "MIDWEST-EE-0": "Alabama",
       // Houston wins South
       "SOUTH-EE-0": "Houston",
@@ -752,14 +755,23 @@ function autoFillBracket(strategy: "conservative" | "mild" | "balanced" | "aggre
     } else { picks[eeKey] = cfg.overrides[eeKey]; }
   }
 
-  // Final Four & Championship from strategy config
-  picks["FF-0"] = cfg.ff[0]; // East winner vs West winner
-  picks["FF-1"] = cfg.ff[2]; // South winner vs Midwest winner
-  // Make sure regional champs match FF picks
+  // Final Four: ff = [East champ, West champ, South champ, Midwest champ]
   picks["EAST-EE-0"] = cfg.ff[0];
   picks["WEST-EE-0"] = cfg.ff[1];
   picks["SOUTH-EE-0"] = cfg.ff[2];
   picks["MIDWEST-EE-0"] = cfg.ff[3];
+  // FF-0 = winner of East vs West semifinal
+  // FF-1 = winner of South vs Midwest semifinal
+  // Determine FF winners: pick the one that matches the champ path
+  picks["FF-0"] = (cfg.champ === cfg.ff[0] || cfg.champ === cfg.ff[1]) 
+    ? cfg.champ 
+    : cfg.ff[0]; // default to East champ
+  picks["FF-1"] = (cfg.champ === cfg.ff[2] || cfg.champ === cfg.ff[3]) 
+    ? cfg.champ 
+    : cfg.ff[2]; // default to South champ
+  // If champ isn't in either semifinal explicitly, pick lower seeds
+  if (picks["FF-0"] !== cfg.ff[0] && picks["FF-0"] !== cfg.ff[1]) picks["FF-0"] = cfg.ff[0];
+  if (picks["FF-1"] !== cfg.ff[2] && picks["FF-1"] !== cfg.ff[3]) picks["FF-1"] = cfg.ff[2];
   picks["CHAMP"] = cfg.champ;
 
   return picks;
