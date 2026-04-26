@@ -448,7 +448,7 @@ const STRATEGIES = {
       "💥 E8: Houston over Illinois — Sampson's 3 straight Final Fours vs Underwood's March underperformance",
       "💥 F4: St. John's to Elite 8 — Pitino (2 titles) + 28-6 + Big East best defense = underseeded at 5",
     ],
-    advice: "Final Four: Duke, Arizona, Houston, Iowa State. Title: Duke over Houston. Key research: 1-seeds make the Final Four only 40% of the time individually. We drop Florida (lost entire backcourt from title team) and Michigan (late-season injuries to Cason). In 10 of 11 recent tournaments, a 5-seed-or-higher crashed the Final Four — Iowa State (2-seed, top-10 D) is our pick.",
+    advice: "Final Four: Duke, Arizona, Houston, Iowa State. Title: Arizona over Duke. Key differentiator: Arizona (32-2) has the DEEPEST roster in America (7 players avg 8.7+ PPG) and beat Florida, UConn, Alabama, Houston, AND Kansas this season. While the public piles on Duke, Arizona's balanced attack and Big 12-tested defense give them the edge. Houston replaces Florida (lost backcourt), Iowa State replaces Michigan (Cason injury).",
   },
   aggressive: {
     label: "🟠 Aggressive",
@@ -464,7 +464,7 @@ const STRATEGIES = {
       "💥 E8: Iowa State over Virginia (Midwest) — Momcilovic (50% from 3) torches Odom's zone",
       "💥 F4: Iowa State to Championship ⬆️ — top-10 D + Momcilovic/Lipsey/Jefferson trio is F4-caliber",
     ],
-    advice: "Final Four: Duke, Arizona, Houston, Iowa State. Title: Duke over Iowa State. Key difference from balanced: we add Cal Baptist over Kansas (KU at 23-10 is the weakest 4-seed, CBU has home crowd in San Diego) and push Iowa State all the way to the title game. SLU over Michigan is the bold R2 call — Michigan's depth took a hit with Cason's injury and SLU's 28-5 record is elite. Historical note: a 2-seed makes the Final Four 22.5% of the time — ISU's defense makes them that team.",
+    advice: "Final Four: Duke, Arizona, Houston, Iowa State. Title: Houston over Duke. Sampson's suffocating defense (88.5 adj. efficiency) has the blueprint to slow Boozer. Houston held opponents to the lowest efficiency in the Big 12. Cal Baptist over Kansas (23-10, weakest 4-seed + CBU home crowd in San Diego) and SLU over Michigan (28-5 vs injured Michigan) are the bold early picks. 2-seeds have won titles twice in the KenPom era (UConn '04, Villanova '16).",
   },
   contrarian: {
     label: "🔴 Contrarian",
@@ -671,11 +671,10 @@ const STRATEGY_OVERRIDES: Record<string, { r1Upsets: string[]; overrides: Record
     r1Upsets: ["Saint Louis", "Iowa", "Missouri", "Santa Clara", "High Point", "McNeese", "Texas"],
     overrides: {
       "SOUTH-EE-0": "Houston",
-      // St. John's to E8 in East
       "EAST-SS-1": "St. John's",
     },
     ff: ["Duke", "Arizona", "Houston", "Iowa State"],
-    champ: "Duke",
+    champ: "Arizona",
   },
   aggressive: {
     r1Upsets: ["Saint Louis", "Iowa", "Missouri", "Santa Clara", "High Point", "McNeese", "Texas", "Utah State", "Cal Baptist"],
@@ -685,7 +684,7 @@ const STRATEGY_OVERRIDES: Record<string, { r1Upsets: string[]; overrides: Record
       "MIDWEST-EE-0": "Iowa State",
     },
     ff: ["Duke", "Arizona", "Houston", "Iowa State"],
-    champ: "Duke",
+    champ: "Houston",
   },
   contrarian: {
     r1Upsets: ["Saint Louis", "Iowa", "Missouri", "Santa Clara", "High Point", "McNeese", "Texas", "Utah State", "UCF", "Cal Baptist"],
