@@ -410,10 +410,10 @@ const STRATEGIES = {
       "🏀 R1: (9) Saint Louis over (8) Georgia — 28-5 record, A-10 POY Robbie Avila, hottest team in the field",
       "🏀 R1: (9) Iowa over (8) Clemson — Bennett Stirtz (20 PPG) gives Iowa the offensive edge",
       "🏀 R1: (10) Missouri over (7) Miami Fla — Mizzou in St. Louis is a massive home-court advantage",
-      "🏆 E8: Houston over Florida in South — Sampson's defense (3 straight Final Fours) > Golden's rebuilt roster",
-      "🏆 F4: Duke wins it all — Cameron Boozer (22.7 PPG, 10.2 RPG) is the best player in the tournament",
+      "🏆 F4: All four 1-seeds reach the Final Four — chalk is safest for small pools",
+      "🏆 Championship: Duke wins it all — Cameron Boozer (22.7 PPG, 10.2 RPG) is the best player in the tournament",
     ],
-    advice: "Final Four: Duke, Arizona, Houston, Michigan. Title: Duke over Arizona. Research shows 2 one-seeds in the Final Four is the historical sweet spot. We keep 3 here for safety but swap Florida for Houston (2-seed with elite defense). 14 of the last 20 champions have been 1-seeds.",
+    advice: "Final Four: Duke, Arizona, Florida, Michigan. Title: Duke over Michigan. Pure chalk Final Four — all four 1-seeds advance. This happened in 2008 and 2015, and while it's not the most common outcome, it maximizes correct picks in a small pool where most people also pick chalk. 14 of the last 20 champions have been 1-seeds.",
   },
   mild: {
     label: "🟢 Mild",
@@ -426,10 +426,10 @@ const STRATEGIES = {
       "🏀 R1: (10) Missouri over (7) Miami Fla — home-court in St. Louis, Mark Mitchell (17.9 PPG)",
       "🏀 R1: (10) Santa Clara over (7) Kentucky — UK 21-13 and 4-6 in last 10; SCU 26-8 with Allen Graves",
       "🏀 R1: (12) High Point over (5) Wisconsin — 30-4 + Hall of Fame coach Tubby Smith + 5-12 line (35%)",
-      "🏆 E8: Houston over Florida (South) — Sampson's defense is championship-caliber; Florida lost its backcourt",
-      "🏆 F4: Duke over UConn in E8 — Boozer (22.7 PPG) is the tournament's best player",
+      "🏆 F4: All four 1-seeds advance — same as conservative but with smarter R1 differentiation",
+      "🏆 Championship: Duke over Michigan — Boozer (22.7 PPG) is the tournament's best player",
     ],
-    advice: "Final Four: Duke, Arizona, Houston, Michigan. Title: Duke. This is conservative+ with two extra R1 upsets backed by data. Santa Clara over Kentucky is a sharp pick — UK's 21-13 record is historically bad for a 7-seed. High Point's 30-4 record and Tubby Smith make the 5-12 magic real. Houston replaces Florida in the Final Four based on Sampson's 3 straight F4 appearances.",
+    advice: "Final Four: Duke, Arizona, Florida, Michigan. Title: Duke over Michigan. Same chalk Final Four as conservative, but with sharper R1 picks. Santa Clara over Kentucky is data-backed (UK 21-13 is historically bad for a 7-seed). High Point's 30-4 + Tubby Smith makes the 5-12 upset real. More differentiation in early rounds while keeping the safe Final Four.",
   },
   balanced: {
     label: "🟡 Balanced",
@@ -657,19 +657,14 @@ type BracketPick = Record<string, string>;
 const STRATEGY_OVERRIDES: Record<string, { r1Upsets: string[]; overrides: Record<string, string>; ff: [string,string,string,string]; champ: string }> = {
   conservative: {
     r1Upsets: ["Saint Louis", "Iowa", "Missouri"],
-    overrides: {
-      // Houston over Florida in South E8
-      "SOUTH-EE-0": "Houston",
-    },
-    ff: ["Duke", "Arizona", "Houston", "Michigan"],
+    overrides: {},
+    ff: ["Duke", "Arizona", "Florida", "Michigan"],
     champ: "Duke",
   },
   mild: {
     r1Upsets: ["Saint Louis", "Iowa", "Missouri", "Santa Clara", "High Point"],
-    overrides: {
-      "SOUTH-EE-0": "Houston",
-    },
-    ff: ["Duke", "Arizona", "Houston", "Michigan"],
+    overrides: {},
+    ff: ["Duke", "Arizona", "Florida", "Michigan"],
     champ: "Duke",
   },
   balanced: {
