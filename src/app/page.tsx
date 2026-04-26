@@ -494,9 +494,74 @@ function upsetLabel(rating: string): string {
 // ─── Interactive Bracket ────────────────────────────────────────────────────
 type BracketPick = Record<string, string>;
 
-function InteractiveBracket() {
+// Auto-fill bracket from a strategy
+function autoFillBracket(strategy: "conservative" | "balanced" | "contrarian"): BracketPick {
+  const picks: BracketPick = {};
+  const regions = ["EAST", "WEST", "SOUTH", "MIDWEST"];
+
+  // Get upset picks for this strategy
+  const strat = STRATEGIES[strategy];
+  const upsetTeams = new Set<string>();
+  for (const pick of strat.picks) {
+    // Extract team name from format like "(9) Saint Louis over (8) Georgia"
+    const match = pick.match(/\(\d+\)\s+([A-Za-z .'']+?)\s+over/i);
+    if (match) upsetTeams.add(match[1].trim());
+  }
+
+  for (const region of regions) {
+    const matchups = getRegionMatchups(region);
+    // R1
+    matchups.forEach((pred, i) => {
+      const slotId = `${region}-R1-${i}`;
+      // Check if the underdog is in the upset set
+      const dog = pred.teamA.seed > pred.teamB.seed ? pred.teamA : pred.teamB;
+      const fav = pred.teamA.seed < pred.teamB.seed ? pred.teamA : pred.teamB;
+      if (upsetTeams.has(dog.name)) {
+        picks[slotId] = dog.name;
+      } else {
+        // Default: pick the AI winner (usually the favorite)
+        picks[slotId] = pred.winner;
+      }
+    });
+    // R2: pick the higher-seeded (lower number) winner from R1
+    for (let i = 0; i < 4; i++) {
+      const a = picks[`${region}-R1-${i * 2}`];
+      const b = picks[`${region}-R1-${i * 2 + 1}`];
+      if (a && b) {
+        const sA = PREDICTIONS.flatMap(p => [p.teamA, p.teamB]).find(t => t.name === a)?.seed ?? 99;
+        const sB = PREDICTIONS.flatMap(p => [p.teamA, p.teamB]).find(t => t.name === b)?.seed ?? 99;
+        picks[`${region}-R2-${i}`] = sA <= sB ? a : b;
+      }
+    }
+    // SS
+    for (let i = 0; i < 2; i++) {
+      const a = picks[`${region}-R2-${i * 2}`];
+      const b = picks[`${region}-R2-${i * 2 + 1}`];
+      if (a && b) {
+        const sA = PREDICTIONS.flatMap(p => [p.teamA, p.teamB]).find(t => t.name === a)?.seed ?? 99;
+        const sB = PREDICTIONS.flatMap(p => [p.teamA, p.teamB]).find(t => t.name === b)?.seed ?? 99;
+        picks[`${region}-SS-${i}`] = sA <= sB ? a : b;
+      }
+    }
+    // EE
+    const a = picks[`${region}-SS-0`];
+    const b = picks[`${region}-SS-1`];
+    if (a && b) {
+      const sA = PREDICTIONS.flatMap(p => [p.teamA, p.teamB]).find(t => t.name === a)?.seed ?? 99;
+      const sB = PREDICTIONS.flatMap(p => [p.teamA, p.teamB]).find(t => t.name === b)?.seed ?? 99;
+      picks[`${region}-EE-0`] = sA <= sB ? a : b;
+    }
+  }
+  // FF
+  const e = picks["EAST-EE-0"], w = picks["WEST-EE-0"], s = picks["SOUTH-EE-0"], m = picks["MIDWEST-EE-0"];
+  if (e && w) picks["FF-0"] = e; // favor East 1-seed
+  if (s && m) picks["FF-1"] = s; // favor South 1-seed
+  if (picks["FF-0"] && picks["FF-1"]) picks["CHAMP"] = picks["FF-0"];
+  return picks;
+}
+
+function InteractiveBracket({ picks, setPicks }: { picks: BracketPick; setPicks: (fn: (prev: BracketPick) => BracketPick) => void }) {
   const [activeRegion, setActiveRegion] = useState("EAST");
-  const [picks, setPicks] = useState<BracketPick>({});
   const [selectedAnalysis, setSelectedAnalysis] = useState<Prediction | null>(null);
 
   const regionNames = ["EAST", "WEST", "SOUTH", "MIDWEST"];
@@ -536,7 +601,7 @@ function InteractiveBracket() {
   ];
   const champGame = { slotId: "CHAMP", teamA: getWinner("FF-0"), teamB: getWinner("FF-1") };
 
-  const handlePick = (slotId: string, team: string) => setPicks(prev => ({ ...prev, [slotId]: team }));
+  const handlePick = (slotId: string, team: string) => setPicks((prev: BracketPick) => ({ ...prev, [slotId]: team }));
 
   const getSeedForTeam = (name: string): number | null => {
     for (const p of PREDICTIONS) {
@@ -555,6 +620,17 @@ function InteractiveBracket() {
     ) || null;
   };
 
+  // Seed-based win probability for later rounds
+  const seedWinProb = (tA: string | null, tB: string | null): string | null => {
+    if (!tA || !tB) return null;
+    const sA = getSeedForTeam(tA) ?? 8;
+    const sB = getSeedForTeam(tB) ?? 8;
+    // Simple logistic model based on seed difference
+    const diff = sB - sA; // positive = A is favored
+    const prob = 1 / (1 + Math.exp(-0.15 * diff * 3));
+    return `${tA} ${(prob*100).toFixed(0)}% - ${((1-prob)*100).toFixed(0)}% ${tB}`;
+  };
+
   const MatchupSlot = ({ slotId, teamA, teamB, round }: { slotId: string; teamA: string | null; teamB: string | null; round: string }) => {
     const winner = getWinner(slotId);
     const pred = findPrediction(teamA, teamB);
@@ -565,12 +641,17 @@ function InteractiveBracket() {
         {/* Header */}
         <div className="flex items-center justify-between px-3 py-1.5" style={{ backgroundColor: "#F9FAFB", borderBottom: "1px solid #F3F4F6" }}>
           <span className="text-[9px] font-bold tracking-wider" style={{ color: "#9CA3AF" }}>{round}</span>
-          {pred && badge && (
-            <button onClick={() => setSelectedAnalysis(pred)} className="text-[8px] font-bold px-1.5 py-0.5 rounded-full border-none cursor-pointer"
-              style={{ backgroundColor: badge.bg, color: badge.text }}>
-              {upsetLabel(pred.upsetRating)} • Details
-            </button>
-          )}
+          <div className="flex items-center gap-1.5">
+            {!pred && teamA && teamB && (
+              <span className="text-[8px] font-medium" style={{ color: "#9CA3AF" }}>{seedWinProb(teamA, teamB)}</span>
+            )}
+            {pred && badge && (
+              <button onClick={() => setSelectedAnalysis(pred)} className="text-[8px] font-bold px-1.5 py-0.5 rounded-full border-none cursor-pointer"
+                style={{ backgroundColor: badge.bg, color: badge.text }}>
+                {upsetLabel(pred.upsetRating)} • Details
+              </button>
+            )}
+          </div>
         </div>
         {/* Teams */}
         {[teamA, teamB].map((name, idx) => {
@@ -604,7 +685,30 @@ function InteractiveBracket() {
           <h2 className="text-xl font-bold" style={{ color: "#1A1A1A" }}>My Bracket</h2>
           <p className="text-sm mt-1" style={{ color: "#9CA3AF" }}>Click a team to advance them. {Object.keys(picks).length} picks made.</p>
         </div>
-        <button onClick={() => { setPicks({}); setSelectedAnalysis(null); }} className="px-3 py-1.5 rounded-lg text-xs font-bold border cursor-pointer" style={{ backgroundColor: "#FEF2F2", color: "#DC2626", borderColor: "#FECACA" }}>Reset</button>
+        <button onClick={() => { setPicks(() => ({})); setSelectedAnalysis(null); }} className="px-3 py-1.5 rounded-lg text-xs font-bold border cursor-pointer" style={{ backgroundColor: "#FEF2F2", color: "#DC2626", borderColor: "#FECACA" }}>Reset</button>
+      </div>
+
+      {/* Auto-fill & Export */}
+      <div className="flex gap-2 mb-4 flex-wrap">
+        <span className="text-xs font-medium self-center" style={{ color: "#9CA3AF" }}>Auto-fill:</span>
+        {(["conservative", "balanced", "contrarian"] as const).map(s => (
+          <button key={s} onClick={() => setPicks(() => autoFillBracket(s))}
+            className="px-3 py-1.5 rounded-lg text-[11px] font-bold border cursor-pointer transition-all hover:shadow"
+            style={{
+              backgroundColor: s === "conservative" ? "#F0FDF4" : s === "balanced" ? "#FFFBEB" : "#FEF2F2",
+              color: s === "conservative" ? "#166534" : s === "balanced" ? "#92400E" : "#991B1B",
+              borderColor: s === "conservative" ? "#BBF7D0" : s === "balanced" ? "#FDE68A" : "#FECACA",
+            }}>
+            {s === "conservative" ? "🟢 Conservative" : s === "balanced" ? "🟡 Balanced" : "🔴 Contrarian"}
+          </button>
+        ))}
+        {Object.keys(picks).length > 10 && (
+          <button onClick={() => window.print()}
+            className="px-3 py-1.5 rounded-lg text-[11px] font-bold border cursor-pointer ml-auto"
+            style={{ backgroundColor: "#EFF6FF", color: "#1E40AF", borderColor: "#BFDBFE" }}>
+            🖨️ Print / PDF
+          </button>
+        )}
       </div>
       <div className="flex gap-2 mb-4 flex-wrap">
         {[...regionNames, "FINAL FOUR"].map((r) => (
@@ -702,6 +806,7 @@ export default function MarchMadnessBracket() {
   const [selectedGame, setSelectedGame] = useState<Prediction | null>(null);
   const [strategyTab, setStrategyTab] = useState<"conservative" | "balanced" | "contrarian">("balanced");
   const [view, setView] = useState<"bracket" | "interactive" | "upsets" | "strategy">("bracket");
+  const [bracketPicks, setBracketPicks] = useState<BracketPick>({});
 
   const regionNames = ["EAST", "WEST", "SOUTH", "MIDWEST"];
 
@@ -1027,7 +1132,7 @@ export default function MarchMadnessBracket() {
         )}
 
         {/* ── Top Upsets View ──────────────────────────────────── */}
-        {view === "interactive" && <InteractiveBracket />}
+        {view === "interactive" && <InteractiveBracket picks={bracketPicks} setPicks={setBracketPicks} />}
 
         {view === "upsets" && (
           <>

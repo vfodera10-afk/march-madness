@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+@media print {
+  body { background: white !important; }
+  .no-print { display: none !important; }
+  button { display: none !important; }
+  .print-show { display: block !important; }
+}
+
 :root {
   --bg: #0A0A0C;
   --surface: #141418;
