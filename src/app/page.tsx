@@ -671,7 +671,6 @@ const STRATEGY_OVERRIDES: Record<string, { r1Upsets: string[]; overrides: Record
     r1Upsets: ["Saint Louis", "Iowa", "Missouri", "Santa Clara", "High Point", "McNeese", "Texas"],
     overrides: {
       "SOUTH-EE-0": "Houston",
-      "EAST-SS-1": "St. John's",
     },
     ff: ["Duke", "Arizona", "Houston", "Iowa State"],
     champ: "Arizona",
