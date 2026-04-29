@@ -694,10 +694,10 @@ const STRATEGY_OVERRIDES: Record<string, { r1Upsets: string[]; overrides: Record
       "WEST-SS-0": "Arkansas",
       // Arkansas wins West
       "WEST-EE-0": "Arkansas",
-      // Iowa State through Midwest top half
-      "MIDWEST-SS-0": "Iowa State",
-      // Alabama through Midwest bottom half  
-      "MIDWEST-SS-1": "Alabama",
+      // Alabama through Midwest top half
+      "MIDWEST-SS-0": "Alabama",
+      // Iowa State through Midwest bottom half
+      "MIDWEST-SS-1": "Iowa State",
       // Alabama wins Midwest
       "MIDWEST-EE-0": "Alabama",
       // Houston wins South
