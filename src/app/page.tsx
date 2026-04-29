@@ -401,6 +401,18 @@ const TOP_UPSETS = [
 
 // ─── Bracket Strategies ─────────────────────────────────────────────────────
 const STRATEGIES = {
+  base: {
+    label: "🔵 Base Model",
+    subtitle: "First Round Only",
+    upsets: 0,
+    expectedCorrect: "26",
+    picks: [
+      "🏀 R1 only: Uses the model's original predicted winner for each of the 32 first-round games",
+      "📊 No strategy flips: This is the raw probability model, not a risk-adjusted bracket pool strategy",
+      "⏭️ Later rounds are left blank so users can make those picks manually",
+    ],
+    advice: "This option is best if you want to start from the model's pure first-round predictions. It does not force a Final Four or champion because those later-round picks depend on the path you choose after Round 1.",
+  },
   conservative: {
     label: "🟢 Conservative",
     subtitle: "Win Your Office Pool (10-30 people)",
@@ -651,10 +663,16 @@ function PrintableBracket({ picks, getSeedForTeam }: { picks: Record<string, str
 
 // ─── Interactive Bracket ────────────────────────────────────────────────────
 type BracketPick = Record<string, string>;
+type StrategyKey = "base" | "conservative" | "mild" | "balanced" | "aggressive" | "contrarian";
 
 // Auto-fill bracket from a strategy
 // Strategy-specific overrides for later rounds
-const STRATEGY_OVERRIDES: Record<string, { r1Upsets: string[]; overrides: Record<string, string>; ff: [string,string,string,string]; champ: string }> = {
+const STRATEGY_OVERRIDES: Record<StrategyKey, { r1Upsets: string[]; overrides: Record<string, string>; ff?: [string,string,string,string]; champ?: string; fillLaterRounds?: boolean }> = {
+  base: {
+    r1Upsets: [],
+    overrides: {},
+    fillLaterRounds: false,
+  },
   conservative: {
     r1Upsets: ["Saint Louis", "Iowa", "Missouri"],
     overrides: {},
@@ -708,7 +726,7 @@ const STRATEGY_OVERRIDES: Record<string, { r1Upsets: string[]; overrides: Record
   },
 };
 
-function autoFillBracket(strategy: "conservative" | "mild" | "balanced" | "aggressive" | "contrarian"): BracketPick {
+function autoFillBracket(strategy: StrategyKey): BracketPick {
   const picks: BracketPick = {};
   const regions = ["EAST", "WEST", "SOUTH", "MIDWEST"];
   const cfg = STRATEGY_OVERRIDES[strategy];
@@ -723,6 +741,10 @@ function autoFillBracket(strategy: "conservative" | "mild" | "balanced" | "aggre
       const dog = pred.teamA.seed > pred.teamB.seed ? pred.teamA : pred.teamB;
       picks[`${region}-R1-${i}`] = upsetSet.has(dog.name) ? dog.name : pred.winner;
     });
+  }
+
+  if (cfg.fillLaterRounds === false) {
+    return picks;
   }
 
   // R2, SS, EE: default = lower seed wins, then apply overrides
@@ -749,6 +771,7 @@ function autoFillBracket(strategy: "conservative" | "mild" | "balanced" | "aggre
   }
 
   // Final Four: ff = [East champ, West champ, South champ, Midwest champ]
+  if (!cfg.ff || !cfg.champ) return picks;
   picks["EAST-EE-0"] = cfg.ff[0];
   picks["WEST-EE-0"] = cfg.ff[1];
   picks["SOUTH-EE-0"] = cfg.ff[2];
@@ -949,8 +972,9 @@ function InteractiveBracket({ picks, setPicks }: { picks: BracketPick; setPicks:
       {/* Auto-fill & Export */}
       <div className="flex gap-2 mb-4 flex-wrap">
         <span className="text-xs font-medium self-center" style={{ color: "#9CA3AF" }}>Auto-fill:</span>
-        {(["conservative", "mild", "balanced", "aggressive", "contrarian"] as const).map(s => {
-          const c: Record<string,{bg:string;text:string;border:string;label:string}> = {
+        {(["base", "conservative", "mild", "balanced", "aggressive", "contrarian"] as const).map(s => {
+          const c: Record<StrategyKey,{bg:string;text:string;border:string;label:string}> = {
+            base: {bg:"#EFF6FF",text:"#1E40AF",border:"#BFDBFE",label:"🔵 Base R1"},
             conservative: {bg:"#F0FDF4",text:"#166534",border:"#BBF7D0",label:"🟢 Safe"},
             mild: {bg:"#ECFDF5",text:"#065F46",border:"#A7F3D0",label:"🟢 Mild"},
             balanced: {bg:"#FFFBEB",text:"#92400E",border:"#FDE68A",label:"🟡 Balanced"},
@@ -1067,7 +1091,7 @@ function InteractiveBracket({ picks, setPicks }: { picks: BracketPick; setPicks:
 export default function MarchMadnessBracket() {
   const [activeRegion, setActiveRegion] = useState("EAST");
   const [selectedGame, setSelectedGame] = useState<Prediction | null>(null);
-  const [strategyTab, setStrategyTab] = useState<"conservative" | "mild" | "balanced" | "aggressive" | "contrarian">("balanced");
+  const [strategyTab, setStrategyTab] = useState<StrategyKey>("balanced");
   const [view, setView] = useState<"about" | "bracket" | "interactive" | "upsets" | "strategy">("about");
   const [bracketPicks, setBracketPicks] = useState<BracketPick>({});
 
@@ -1605,9 +1629,10 @@ export default function MarchMadnessBracket() {
 
             {/* Strategy tabs */}
             <div className="flex gap-2 mb-6">
-              {(["conservative", "mild", "balanced", "aggressive", "contrarian"] as const).map((s) => {
+              {(["base", "conservative", "mild", "balanced", "aggressive", "contrarian"] as const).map((s) => {
                 const strat = STRATEGIES[s];
-                const colors: Record<string, {bg:string;text:string;border:string}> = {
+                const colors: Record<StrategyKey, {bg:string;text:string;border:string}> = {
+                  base: {bg:"#DBEAFE",text:"#1E40AF",border:"#BFDBFE"},
                   conservative: {bg:"#DCFCE7",text:"#166534",border:"#BBF7D0"},
                   mild: {bg:"#D1FAE5",text:"#065F46",border:"#A7F3D0"},
                   balanced: {bg:"#FEF3C7",text:"#92400E",border:"#FDE68A"},
@@ -1635,7 +1660,8 @@ export default function MarchMadnessBracket() {
             {/* Selected strategy */}
             {(() => {
               const strat = STRATEGIES[strategyTab];
-              const colorMap: Record<string,{border:string;bg:string}> = {
+              const colorMap: Record<StrategyKey,{border:string;bg:string}> = {
+                base: {border:"#BFDBFE",bg:"#EFF6FF"},
                 conservative: {border:"#BBF7D0",bg:"#F0FDF4"},
                 mild: {border:"#A7F3D0",bg:"#ECFDF5"},
                 balanced: {border:"#FDE68A",bg:"#FFFBEB"},
